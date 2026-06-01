@@ -4,8 +4,8 @@ import { geminiChat, isGeminiConfigured } from "@/lib/gemini";
 export type LlmBackend = "groq" | "gemini" | "none";
 
 export function getTextLlmBackend(): LlmBackend {
-  if (isGroqConfigured()) return "groq";
   if (isGeminiConfigured()) return "gemini";
+  if (isGroqConfigured()) return "groq";
   return "none";
 }
 
@@ -13,7 +13,7 @@ export function isTextLlmConfigured(): boolean {
   return getTextLlmBackend() !== "none";
 }
 
-/** Text completion — prefers Groq when GROQ_API_KEY is set, else Gemini. */
+/** Text completion - prefers Gemini Flash for chat, with Groq as fallback. */
 export async function completeText(params: {
   system: string;
   user: string;
@@ -21,11 +21,11 @@ export async function completeText(params: {
   temperature?: number;
 }): Promise<string> {
   const backend = getTextLlmBackend();
-  if (backend === "groq") {
-    return groqChat(params);
-  }
   if (backend === "gemini") {
     return geminiChat(params);
   }
-  throw new Error("No text LLM configured (set GROQ_API_KEY or GEMINI_API_KEY)");
+  if (backend === "groq") {
+    return groqChat(params);
+  }
+  throw new Error("No text LLM configured (set GEMINI_API_KEY or GROQ_API_KEY)");
 }

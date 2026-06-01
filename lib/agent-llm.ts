@@ -12,7 +12,7 @@ const SYSTEM = `You are Glamora's Bangalore salon booking assistant. Reply ONLY 
 
 const LLM_TIMEOUT_MS = 4_000;
 
-/** Uses Groq when GROQ_API_KEY is set, otherwise Gemini. Skipped if AGENT_USE_LLM=false. */
+/** Uses Gemini Flash by default. Skipped if AGENT_USE_LLM=false. */
 export async function parseWithLlm(
   query: string,
   salons: SalonDoc[]

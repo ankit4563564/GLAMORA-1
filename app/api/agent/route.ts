@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAgentUserId } from "@/lib/auth";
 import { parseWithLlm } from "@/lib/agent-llm";
-import { isGroqConfigured } from "@/lib/groq";
 import { isTextLlmConfigured } from "@/lib/llm";
 import { parseUserQuery } from "@/lib/agent-query";
 import { getSalonsCached } from "@/lib/salon-cache";
@@ -57,8 +56,7 @@ function needsLlm(parsed: ReturnType<typeof parseUserQuery>, query: string): boo
   if (/^(hi|hello|hey|namaste|thanks|thank you)\b/i.test(query.trim())) {
     return false;
   }
-  const minLen = isGroqConfigured() ? 30 : 120;
-  return parsed.intent === "general" && query.length > minLen;
+  return parsed.intent === "general" && query.length > 30;
 }
 
 function resolveLocationPhrase(
