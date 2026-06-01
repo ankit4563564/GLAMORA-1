@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
 const MONGODB_URI = process.env.MONGODB_URI;
+const MONGODB_TIMEOUT_MS = 3_500;
 
 interface MongooseCache {
   conn: typeof mongoose | null;
@@ -27,9 +28,17 @@ export async function connectDB(): Promise<typeof mongoose> {
   if (cached.conn) return cached.conn;
 
   if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGODB_URI, {
-      bufferCommands: false,
-    });
+    cached.promise = mongoose
+      .connect(MONGODB_URI, {
+        bufferCommands: false,
+        connectTimeoutMS: MONGODB_TIMEOUT_MS,
+        serverSelectionTimeoutMS: MONGODB_TIMEOUT_MS,
+        socketTimeoutMS: MONGODB_TIMEOUT_MS,
+      })
+      .catch((error) => {
+        cached.promise = null;
+        throw error;
+      });
   }
 
   cached.conn = await cached.promise;
