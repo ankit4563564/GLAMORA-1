@@ -15,13 +15,13 @@ export function getGeminiClient(): GoogleGenerativeAI {
 
 export function getVisionModel() {
   return getGeminiClient().getGenerativeModel({
-    model: process.env.GEMINI_VISION_MODEL?.trim() || "gemini-2.0-flash",
+    model: process.env.GEMINI_VISION_MODEL?.trim() || "gemini-1.5-flash",
   });
 }
 
 export function getAgentModel() {
   const modelName =
-    process.env.GEMINI_AGENT_MODEL?.trim() || "gemini-2.0-flash";
+    process.env.GEMINI_AGENT_MODEL?.trim() || "gemini-1.5-flash";
   return getGeminiClient().getGenerativeModel({
     model: modelName,
     generationConfig: { maxOutputTokens: 256, temperature: 0.2 },
@@ -30,7 +30,7 @@ export function getAgentModel() {
 
 export function getMarketingModel() {
   return getGeminiClient().getGenerativeModel({
-    model: process.env.GEMINI_MARKETING_MODEL?.trim() || "gemini-2.0-flash",
+    model: process.env.GEMINI_MARKETING_MODEL?.trim() || "gemini-1.5-flash",
   });
 }
 
@@ -42,7 +42,7 @@ export async function geminiChat(params: {
   temperature?: number;
 }): Promise<string> {
   const model = getGeminiClient().getGenerativeModel({
-    model: process.env.GEMINI_AGENT_MODEL?.trim() || "gemini-2.0-flash",
+    model: process.env.GEMINI_AGENT_MODEL?.trim() || "gemini-1.5-flash",
     generationConfig: {
       maxOutputTokens: params.maxTokens ?? 512,
       temperature: params.temperature ?? 0.3,
