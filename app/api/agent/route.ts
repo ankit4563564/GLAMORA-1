@@ -126,10 +126,13 @@ function resolveLocationPhrase(
     extractLocationPhrase(query),
   ].filter(Boolean) as string[];
 
+  // 1. Prefer known Bangalore phrases
   for (const phrase of candidates) {
     if (isKnownLocationPhrase(phrase)) return phrase;
   }
-  return null;
+  
+  // 2. Fallback to the first mentioned phrase (to handle Pune, Mumbai, etc.)
+  return candidates[0] || null;
 }
 
 function generalReply(query: string): string {
