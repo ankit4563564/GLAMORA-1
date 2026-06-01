@@ -1,14 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Star } from "lucide-react";
+import { SalonImage } from "@/components/salon-image";
+import { resolveSalonImage } from "@/lib/salon-images";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { fadeUp } from "@/lib/motion";
-import { cn } from "@/lib/utils";
 
 export interface SalonCardData {
   _id: string;
@@ -20,9 +19,6 @@ export interface SalonCardData {
   images: string[];
 }
 
-const PLACEHOLDER =
-  "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=800&q=80";
-
 export function SalonCard({
   salon,
   index = 0,
@@ -30,8 +26,7 @@ export function SalonCard({
   salon: SalonCardData;
   index?: number;
 }) {
-  const [loaded, setLoaded] = useState(false);
-  const src = salon.images?.[0] || PLACEHOLDER;
+  const src = resolveSalonImage(salon.images?.[0], index);
 
   return (
     <motion.article
@@ -43,27 +38,16 @@ export function SalonCard({
       className="group relative aspect-[3/4] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#1A1C29]/40 shadow-glass transition-[border-color,box-shadow] duration-300 hover:border-amber-500/50 hover:shadow-gold-glow"
     >
       <div
-        className={cn(
-          "absolute inset-0 bg-[#12131C] transition-opacity duration-500",
-          loaded ? "opacity-0" : "opacity-100"
-        )}
-        aria-hidden
-      />
-      <div
         className="absolute inset-0 scale-110 bg-cover bg-center blur-2xl opacity-40"
         style={{ backgroundImage: `url(${src})` }}
         aria-hidden
       />
-      <Image
+      <SalonImage
         src={src}
         alt={salon.name}
         fill
-        className={cn(
-          "object-cover transition-transform duration-700 group-hover:scale-110",
-          loaded ? "opacity-100" : "opacity-0"
-        )}
+        className="object-cover transition-transform duration-700 group-hover:scale-110"
         sizes="(max-width: 768px) 100vw, 33vw"
-        onLoad={() => setLoaded(true)}
       />
       <div className="absolute inset-0 bg-gradient-to-t from-[#0B0C10] via-[#0B0C10]/50 to-transparent" />
       <div className="absolute bottom-0 left-0 right-0 p-5">

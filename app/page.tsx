@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import { SalonImage } from "@/components/salon-image";
 import { motion } from "framer-motion";
 import { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -67,7 +67,13 @@ export default function HomePage() {
               animate={{ y: [0, -12, 0] }}
               transition={{ repeat: Infinity, duration: 4 + i, ease: "easeInOut" }}
             >
-              <Image src={s.images[0]} alt="" width={144} height={192} className="object-cover" />
+              <SalonImage
+                src={s.images[0]}
+                alt=""
+                width={144}
+                height={192}
+                className="object-cover"
+              />
             </motion.div>
           ))}
         </div>

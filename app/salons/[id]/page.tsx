@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
+import { SalonImage } from "@/components/salon-image";
+import { resolveSalonImages } from "@/lib/salon-images";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -42,7 +43,11 @@ export default function SalonDetailPage({ params }: { params: { id: string } }) 
       ? parseInt(params.id.replace("seed-", ""), 10)
       : -1;
     if (idx >= 0 && SEED_SALONS[idx]) {
-      setSalon({ ...SEED_SALONS[idx], _id: params.id } as Salon);
+      setSalon({
+        ...SEED_SALONS[idx],
+        _id: params.id,
+        images: resolveSalonImages(SEED_SALONS[idx].images),
+      } as Salon);
       setLoading(false);
       return;
     }
@@ -93,8 +98,8 @@ export default function SalonDetailPage({ params }: { params: { id: string } }) 
       <div className="relative mx-auto max-w-6xl px-4 pb-28 pt-6">
         <div className="relative h-72 overflow-hidden rounded-2xl md:h-96">
           {salon.images.map((img, i) => (
-            <Image
-              key={img}
+            <SalonImage
+              key={`${img}-${i}`}
               src={img}
               alt={salon.name}
               fill

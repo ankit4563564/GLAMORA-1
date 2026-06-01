@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton, SignedIn, SignedOut } from "@clerk/nextjs";
+import { isClerkConfiguredClient } from "@/lib/clerk-config";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 
@@ -17,7 +18,12 @@ export function Nav() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-10 z-40 border-b border-white/5 glass-panel">
+    <header
+      className={cn(
+        "sticky z-40 border-b border-white/5 glass-panel",
+        isClerkConfiguredClient ? "top-10" : "top-0"
+      )}
+    >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
         <Link href="/" className="font-display text-xl font-semibold tracking-tight">
           <span className="text-cream">Glam</span>
@@ -43,20 +49,28 @@ export function Nav() {
           ))}
         </nav>
         <div className="flex items-center gap-3">
-          <SignedOut>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/sign-in">Sign In</Link>
-            </Button>
+          {isClerkConfiguredClient ? (
+            <>
+              <SignedOut>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/sign-in">Sign In</Link>
+                </Button>
+                <Button size="sm" asChild>
+                  <Link href="/sign-up">Get Started</Link>
+                </Button>
+              </SignedOut>
+              <SignedIn>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/profile">Profile</Link>
+                </Button>
+                <UserButton afterSignOutUrl="/" />
+              </SignedIn>
+            </>
+          ) : (
             <Button size="sm" asChild>
-              <Link href="/sign-up">Get Started</Link>
+              <Link href="/salons">Explore Salons</Link>
             </Button>
-          </SignedOut>
-          <SignedIn>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/profile">Profile</Link>
-            </Button>
-            <UserButton afterSignOutUrl="/" />
-          </SignedIn>
+          )}
         </div>
       </div>
     </header>

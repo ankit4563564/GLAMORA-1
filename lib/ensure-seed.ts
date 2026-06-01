@@ -1,6 +1,7 @@
 import { connectDB } from "./mongodb";
 import { Salon } from "@/models/Salon";
 import { SEED_SALONS } from "./seed-data";
+import { resolveSalonImages } from "./salon-images";
 
 let seedPromise: Promise<number> | null = null;
 
@@ -8,6 +9,7 @@ export function seedFallbackSalons() {
   return SEED_SALONS.map((s, i) => ({
     ...s,
     _id: `seed-${i}`,
+    images: resolveSalonImages(s.images),
   }));
 }
 

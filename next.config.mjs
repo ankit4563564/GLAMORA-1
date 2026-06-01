@@ -6,6 +6,9 @@ const nextConfig = {
       { protocol: "https", hostname: "res.cloudinary.com" },
     ],
   },
+  experimental: {
+    serverComponentsExternalPackages: ["mongoose", "mongodb"],
+  },
 };
 
 export default nextConfig;

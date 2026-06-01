@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getUserId } from "@/lib/auth";
 import { getAgentModel } from "@/lib/gemini";
 import { getSalons } from "@/lib/salons";
 import type { SalonDoc } from "@/lib/salons";
@@ -12,11 +12,9 @@ import {
   searchSalonsByLocation,
   buildLocationResponse,
 } from "@/lib/location-search";
+import { resolveSalonImages } from "@/lib/salon-images";
 
 export const dynamic = "force-dynamic";
-
-const DEFAULT_IMAGE =
-  "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=800&q=80";
 
 function toSalonCard(s: SalonDoc) {
   return {
@@ -26,7 +24,7 @@ function toSalonCard(s: SalonDoc) {
     rating: s.rating,
     priceRange: s.priceRange,
     specialty: s.specialty,
-    images: s.images?.length > 0 ? s.images : [DEFAULT_IMAGE],
+    images: resolveSalonImages(s.images),
   };
 }
 
@@ -39,7 +37,7 @@ Extract intent and filters. Respond ONLY with JSON:
 }`;
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
+  const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

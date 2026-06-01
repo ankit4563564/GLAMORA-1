@@ -2,16 +2,21 @@ import { connectDB } from "./mongodb";
 import { Salon } from "@/models/Salon";
 import { ensureSalonsSeeded, seedFallbackSalons } from "./ensure-seed";
 import { SEED_SALONS } from "./seed-data";
+import { resolveSalonImages } from "./salon-images";
 
 export type SalonDoc = (typeof SEED_SALONS)[0] & { _id: string };
 
 function mapSalons(
   salons: Array<Record<string, unknown> & { _id: unknown }>
 ): SalonDoc[] {
-  return salons.map((s) => ({
-    ...(s as Record<string, unknown>),
-    _id: String(s._id),
-  })) as unknown as SalonDoc[];
+  return salons.map((s) => {
+    const row = s as Record<string, unknown> & { images?: string[] };
+    return {
+      ...row,
+      _id: String(s._id),
+      images: resolveSalonImages(row.images),
+    };
+  }) as unknown as SalonDoc[];
 }
 
 export async function getSalons(filters?: {
@@ -118,7 +123,12 @@ export async function getSalonById(id: string): Promise<SalonDoc | null> {
     await ensureSalonsSeeded();
     const salon = (await Salon.findById(id).lean()) as SalonDoc | null;
     if (salon) {
-      return { ...salon, _id: String((salon as { _id: unknown })._id) };
+      const row = salon as SalonDoc & { images?: string[] };
+      return {
+        ...row,
+        _id: String((salon as { _id: unknown })._id),
+        images: resolveSalonImages(row.images),
+      };
     }
   } catch {
     /* fallback below */

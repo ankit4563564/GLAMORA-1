@@ -24,8 +24,9 @@ function buildSlots(): string[] {
   return slots;
 }
 
-const unsplash = (id: string) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=800&q=80`;
+import { unsplashUrl } from "./salon-images";
+
+const unsplash = (id: string) => unsplashUrl(id);
 
 export const SEED_SALONS = [
   {
@@ -86,7 +87,7 @@ export const SEED_SALONS = [
     images: [
       unsplash("photo-1503951914875-452162b0f3f1"),
       unsplash("photo-1622286342621-4bd786c2447c"),
-      unsplash("photo-1599351431202-1e0c2b8d0b0e"),
+      unsplash("photo-1621605815191-6b01514a29f0"),
     ],
     openHours: "10:00 AM – 8:00 PM",
     availableSlots: buildSlots(),
@@ -125,7 +126,7 @@ export const SEED_SALONS = [
     images: [
       unsplash("photo-1521590832167-7bcbfaa6381f"),
       unsplash("photo-1633681923016-1962d3648a3a"),
-      unsplash("photo-1522336573288-0b6b6b6b6b6b"),
+      unsplash("photo-1522337360788-8b13dee7a37e"),
     ],
     openHours: "10:00 AM – 8:00 PM",
     availableSlots: buildSlots(),
@@ -201,7 +202,7 @@ export const SEED_SALONS = [
     images: [
       unsplash("photo-1519741497674-611481863552"),
       unsplash("photo-1487412948497-84dc97e43b0b"),
-      unsplash("photo-1522335789203-aabd1fc54bc9"),
+      unsplash("photo-1516975080664-ed2fc6a32983"),
     ],
     openHours: "10:00 AM – 8:00 PM",
     availableSlots: buildSlots(),

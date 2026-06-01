@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getUserId } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { getVisionModel } from "@/lib/gemini";
 import { BEAUTY_AI_FALLBACK } from "@/lib/seed-data";
@@ -11,7 +11,7 @@ export const maxDuration = 30;
 const PROMPT = `You are a professional beauty consultant AI. Analyze this selfie and return ONLY valid JSON with this structure: { "faceShape": { "shape": string, "confidence": number, "description": string, "recommendedStyles": string[] }, "skinTone": { "undertone": string, "complexion": string, "treatments": string[] }, "hairTexture": { "type": string, "condition": string, "treatments": string[] } }`;
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
+  const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

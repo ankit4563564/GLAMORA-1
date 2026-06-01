@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { currentUser } from "@clerk/nextjs/server";
+import { getUserId } from "@/lib/auth";
+import { isClerkConfigured } from "@/lib/clerk-config";
 import { getMarketingModel } from "@/lib/gemini";
 
 export const dynamic = "force-dynamic";
@@ -11,9 +13,13 @@ const FALLBACK = [
 ];
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
+  const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!isClerkConfigured()) {
+    return NextResponse.json({ captions: FALLBACK });
   }
 
   const user = await currentUser();

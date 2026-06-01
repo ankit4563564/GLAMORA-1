@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import Image from "next/image";
+import { SalonImage } from "@/components/salon-image";
+import { DEFAULT_SALON_IMAGE } from "@/lib/salon-images";
 import Link from "next/link";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -43,8 +44,6 @@ const SUGGESTIONS = [
   "Book a haircut at Luxe Hair Lounge for tomorrow at 11 AM",
 ];
 
-const FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=800&q=80";
 
 function newId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -208,12 +207,11 @@ export function ChatInterface() {
                     className="overflow-hidden rounded-xl border border-white/10 bg-[#1A1C29]/80 shadow-glass"
                   >
                     <div className="relative h-32 w-full">
-                      <Image
-                        src={salon.images?.[0] || FALLBACK_IMAGE}
+                      <SalonImage
+                        src={salon.images?.[0] || DEFAULT_SALON_IMAGE}
                         alt={salon.name}
                         fill
                         className="object-cover"
-                        unoptimized
                       />
                     </div>
                     <div className="p-3">
