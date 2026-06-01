@@ -85,6 +85,10 @@ export function ChatInterface() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typing]);
 
+  useEffect(() => {
+    fetch("/api/salons").catch(() => {});
+  }, []);
+
   const send = useCallback(
     async (text?: string) => {
       const content = (text || input).trim();
@@ -111,20 +115,13 @@ export function ChatInterface() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Request failed");
 
-        let salons: SalonPayload[] | undefined = data.salons;
-        if (data.type === "salons" && (!salons || salons.length === 0)) {
-          const fallback = await fetch("/api/salons");
-          const salonData = await fallback.json();
-          salons = (salonData.salons || []).slice(0, 4);
-        }
-
         setMessages((prev) => [
           ...prev,
           {
             id: newId(),
             role: "assistant",
             content: data.response || "Here are your matches.",
-            salons,
+            salons: data.salons,
             booking: data.booking,
           },
         ]);

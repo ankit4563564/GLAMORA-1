@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { Salon } from "@/models/Salon";
 import { SEED_SALONS } from "@/lib/seed-data";
+import { invalidateSalonCache } from "@/lib/salon-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export async function GET(req: Request) {
     }
     await Salon.deleteMany({});
     await Salon.insertMany(SEED_SALONS);
+    invalidateSalonCache();
     return NextResponse.json({
       message: "Seeded successfully",
       count: SEED_SALONS.length,

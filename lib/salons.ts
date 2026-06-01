@@ -54,7 +54,11 @@ export async function getSalons(filters?: {
       ];
     }
 
-    let salons = await Salon.find(query).lean();
+    let salons = await Salon.find(query)
+      .select(
+        "name area city rating reviewCount specialty description services images openHours availableSlots priceRange tags sentimentSummary ownerName ownerEmail"
+      )
+      .lean();
 
     if (filters?.category && filters.category !== "All") {
       salons = salons.filter((s) =>

@@ -18,8 +18,11 @@ export function getVisionModel() {
 export function getAgentModel() {
   const client = getGeminiClient();
   const modelName =
-    process.env.GEMINI_AGENT_MODEL || "gemini-2.0-flash";
-  return client.getGenerativeModel({ model: modelName });
+    process.env.GEMINI_AGENT_MODEL || "gemini-1.5-flash";
+  return client.getGenerativeModel({
+    model: modelName,
+    generationConfig: { maxOutputTokens: 256, temperature: 0.2 },
+  });
 }
 
 export function getMarketingModel() {

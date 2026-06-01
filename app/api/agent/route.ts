@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserId } from "@/lib/auth";
-import { getAgentModel } from "@/lib/gemini";
-import { getSalons } from "@/lib/salons";
+import { parseWithLlm } from "@/lib/agent-llm";
+import { parseUserQuery } from "@/lib/agent-query";
+import { getSalonsCached } from "@/lib/salon-cache";
 import type { SalonDoc } from "@/lib/salons";
 import { connectDB } from "@/lib/mongodb";
 import { Booking } from "@/models/Booking";
 import { generateBookingId } from "@/lib/utils";
-import { parseUserQuery } from "@/lib/agent-query";
 import {
   extractLocationPhrase,
   searchSalonsByLocation,
@@ -15,6 +15,7 @@ import {
 import { resolveSalonImages } from "@/lib/salon-images";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 function toSalonCard(s: SalonDoc) {
   return {
@@ -28,13 +29,31 @@ function toSalonCard(s: SalonDoc) {
   };
 }
 
-const SYSTEM = `You are Glamora's AI booking assistant for Bangalore, India.
-Extract intent and filters. Respond ONLY with JSON:
-{
-  "intent": "search"|"book"|"check_slots"|"recommend"|"general",
-  "filters": { "area": "locality user mentioned", "maxPrice": number|null, "service": string|null, "salonName": string|null },
-  "response": "short friendly sentence"
-}`;
+function findSalonInQuery(query: string, salons: SalonDoc[]): SalonDoc | undefined {
+  const q = query.toLowerCase();
+  const exact = salons.find((s) => q.includes(s.name.toLowerCase()));
+  if (exact) return exact;
+  return salons.find((s) =>
+    s.name
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length > 3)
+      .some((w) => q.includes(w))
+  );
+}
+
+function needsLlm(parsed: ReturnType<typeof parseUserQuery>, query: string): boolean {
+  if (process.env.AGENT_USE_LLM === "false") return false;
+  if (parsed.isDiscovery || parsed.intent === "search" || parsed.intent === "recommend") {
+    return false;
+  }
+  if (parsed.intent === "check_slots") return false;
+  if (parsed.intent === "book") return false;
+  if (/^(hi|hello|hey|namaste|thanks|thank you)\b/i.test(query.trim())) {
+    return false;
+  }
+  return parsed.intent === "general" && query.length > 120;
+}
 
 export async function POST(req: NextRequest) {
   const userId = await getUserId();
@@ -52,13 +71,13 @@ export async function POST(req: NextRequest) {
   }
 
   const parsed = parseUserQuery(query);
-  const salons = await getSalons();
+  const salons = await getSalonsCached();
 
   if (salons.length === 0) {
     return NextResponse.json({
       type: "text",
       response:
-        "Could not load salons. Check MONGODB_URI in .env.local or visit /api/seed once.",
+        "Could not load salons. Check MONGODB_URI or visit /api/seed once.",
     });
   }
 
@@ -66,28 +85,11 @@ export async function POST(req: NextRequest) {
   let geminiResponse = "";
   let geminiIntent = parsed.intent;
 
-  try {
-    const context = salons
-      .map((s) => `${s.name} (${s.area}): ${s.specialty}, ₹ services from ${Math.min(...s.services.map((x) => x.price))}`)
-      .join("\n");
-    const model = getAgentModel();
-    const result = await model.generateContent(
-      `${SYSTEM}\n\nPartners:\n${context}\n\nUser: ${query}`
-    );
-    const text = result.response.text();
-    const match = text.match(/\{[\s\S]*\}/);
-    if (match) {
-      const data = JSON.parse(match[0]) as {
-        intent?: string;
-        filters?: Record<string, string | number>;
-        response?: string;
-      };
-      if (data.intent) geminiIntent = data.intent as typeof parsed.intent;
-      if (data.filters) geminiFilters = data.filters;
-      if (data.response) geminiResponse = data.response;
-    }
-  } catch {
-    /* location search works without Gemini */
+  if (needsLlm(parsed, query)) {
+    const llm = await parseWithLlm(query, salons);
+    if (llm?.intent) geminiIntent = llm.intent as typeof parsed.intent;
+    if (llm?.filters) geminiFilters = llm.filters;
+    if (llm?.response) geminiResponse = llm.response;
   }
 
   const locationPhrase =
@@ -99,18 +101,30 @@ export async function POST(req: NextRequest) {
     parsed.maxPrice ??
     (geminiFilters.maxPrice ? Number(geminiFilters.maxPrice) : undefined);
 
-  const service = parsed.service || (geminiFilters.service ? String(geminiFilters.service) : undefined);
+  const service =
+    parsed.service ||
+    (geminiFilters.service ? String(geminiFilters.service) : undefined);
 
   const isDiscovery =
     parsed.isDiscovery ||
     Boolean(locationPhrase) ||
     geminiIntent === "search" ||
     geminiIntent === "recommend" ||
-    /\b(suggest|find|recommend|salon|near|budget|live|where|location)\b/i.test(query);
+    /\b(suggest|find|recommend|salon|near|budget|live|where|location)\b/i.test(
+      query
+    );
 
-  if (geminiIntent === "book") {
-    const nameHint = String(geminiFilters.salonName || query).toLowerCase();
-    const salon = salons.find((s) => nameHint.includes(s.name.toLowerCase()));
+  if (geminiIntent === "book" || parsed.intent === "book") {
+    const salon =
+      findSalonInQuery(query, salons) ||
+      (geminiFilters.salonName
+        ? salons.find((s) =>
+            String(geminiFilters.salonName)
+              .toLowerCase()
+              .includes(s.name.toLowerCase())
+          )
+        : undefined);
+
     if (salon) {
       const servicePick =
         salon.services.find((svc) => svc.price <= (maxPrice ?? Infinity)) ||
@@ -188,6 +202,14 @@ export async function POST(req: NextRequest) {
         exactMatch: search.exactMatch,
         totalPartners: salons.length,
       },
+    });
+  }
+
+  if (/^(hi|hello|hey|namaste)\b/i.test(query.trim())) {
+    return NextResponse.json({
+      type: "text",
+      response:
+        "Namaste! Ask for salons by area or budget — e.g. “fade under ₹1200 in Koramangala”.",
     });
   }
 
