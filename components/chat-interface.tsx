@@ -79,6 +79,8 @@ export function ChatInterface() {
   const [typing, setTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -98,21 +100,18 @@ export function ChatInterface() {
 
     const userMsg: Message = { id: newId(), role: "user", content };
 
-    let history: { role: string; content: string }[] = [];
-    setMessages((prev) => {
-      const next = [...prev, userMsg].slice(-11);
-      history = next
-        .filter((m) => m.role === "user" || m.role === "assistant")
-        .slice(-10)
-        .map((m) => ({ role: m.role, content: m.content }));
-      return next;
-    });
+    const history = [...messagesRef.current, userMsg]
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .slice(-10)
+      .map((m) => ({ role: m.role, content: m.content }));
+
+    setMessages((prev) => [...prev, userMsg].slice(-11));
 
     try {
       const res = await fetch("/api/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history }),
+        body: JSON.stringify({ query: content, messages: history }),
       });
       const data = await res.json();
 
@@ -120,7 +119,9 @@ export function ChatInterface() {
         const errText =
           data.error === "Unauthorized"
             ? "Please sign in (or use Try Demo at the top) to chat with the agent."
-            : data.error || "Something went wrong. Try again.";
+            : data.error === "Message required"
+              ? "Something went wrong sending your message. Please try again."
+              : data.error || "Something went wrong. Try again.";
         setMessages((prev) => [
           ...prev,
           { id: newId(), role: "assistant", content: errText },

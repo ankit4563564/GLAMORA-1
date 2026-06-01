@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAgentUserId } from "@/lib/auth";
 import { parseWithLlm } from "@/lib/agent-llm";
+import { isGroqConfigured } from "@/lib/groq";
+import { isTextLlmConfigured } from "@/lib/llm";
 import { parseUserQuery } from "@/lib/agent-query";
 import { getSalonsCached } from "@/lib/salon-cache";
 import type { SalonDoc } from "@/lib/salons";
@@ -46,6 +48,7 @@ function findSalonInQuery(query: string, salons: SalonDoc[]): SalonDoc | undefin
 
 function needsLlm(parsed: ReturnType<typeof parseUserQuery>, query: string): boolean {
   if (process.env.AGENT_USE_LLM === "false") return false;
+  if (!isTextLlmConfigured()) return false;
   if (parsed.isDiscovery || parsed.intent === "search" || parsed.intent === "recommend") {
     return false;
   }
@@ -54,7 +57,8 @@ function needsLlm(parsed: ReturnType<typeof parseUserQuery>, query: string): boo
   if (/^(hi|hello|hey|namaste|thanks|thank you)\b/i.test(query.trim())) {
     return false;
   }
-  return parsed.intent === "general" && query.length > 120;
+  const minLen = isGroqConfigured() ? 30 : 120;
+  return parsed.intent === "general" && query.length > minLen;
 }
 
 function resolveLocationPhrase(
@@ -91,11 +95,20 @@ function generalReply(query: string): string {
 export async function POST(req: NextRequest) {
   const userId = await getAgentUserId();
 
-  const { messages } = await req.json();
-  const lastUser = [...messages]
+  const body = await req.json();
+  const directQuery =
+    typeof body.query === "string" ? body.query.trim() : "";
+  const messageList = Array.isArray(body.messages) ? body.messages : [];
+  const lastUser = [...messageList]
     .reverse()
-    .find((m: { role: string }) => m.role === "user");
-  const query = lastUser?.content?.trim() || "";
+    .find((m: { role?: string }) => m?.role === "user");
+  const fromHistory =
+    typeof lastUser?.content === "string"
+      ? lastUser.content.trim()
+      : typeof lastUser?.text === "string"
+        ? lastUser.text.trim()
+        : "";
+  const query = directQuery || fromHistory;
   if (!query) {
     return NextResponse.json({ error: "Message required" }, { status: 400 });
   }
