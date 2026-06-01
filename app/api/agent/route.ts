@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAgentUserId } from "@/lib/auth";
 import { parseWithLlm } from "@/lib/agent-llm";
-import { isTextLlmConfigured } from "@/lib/llm";
+import { completeText, isTextLlmConfigured } from "@/lib/llm";
 import { parseUserQuery } from "@/lib/agent-query";
 import { getSalonsCached } from "@/lib/salon-cache";
 import type { SalonDoc } from "@/lib/salons";
@@ -18,6 +18,7 @@ import { resolveSalonImages } from "@/lib/salon-images";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
+const CHAT_TIMEOUT_MS = 6_000;
 
 function toSalonCard(s: SalonDoc) {
   return {
@@ -59,6 +60,54 @@ function needsLlm(parsed: ReturnType<typeof parseUserQuery>, query: string): boo
   return parsed.intent === "general" && query.length > 30;
 }
 
+function isConversationalQuery(
+  parsed: ReturnType<typeof parseUserQuery>,
+  query: string
+): boolean {
+  if (parsed.isDiscovery || parsed.intent !== "general") return false;
+  if (
+    /\b(price|cost|how much|expensive|cheap|hour|timing|open|close|when|help|what can you|how do)\b/i.test(
+      query
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
+async function chatLikeAssistant(
+  query: string,
+  messages: Array<{ role?: string; content?: string }>
+): Promise<string | null> {
+  if (process.env.AGENT_USE_LLM === "false") return null;
+  if (!isTextLlmConfigured()) return null;
+
+  const recent = messages
+    .filter((m) => m?.role === "user" || m?.role === "assistant")
+    .slice(-8)
+    .map((m) => `${m.role}: ${m.content || ""}`)
+    .join("\n");
+
+  const work = completeText({
+    system:
+      "You are Glamora's friendly AI concierge. Respond like a normal helpful ChatGPT-style assistant, but stay concise. You can answer general questions, acknowledge thanks, and keep conversation natural. When the user asks about salons, beauty services, booking, prices, or areas, guide them toward Glamora's Bangalore salon marketplace.",
+    user: `Recent chat:\n${recent || "No prior chat."}\n\nUser: ${query}`,
+    maxTokens: 220,
+    temperature: 0.5,
+  });
+
+  try {
+    return await Promise.race([
+      work,
+      new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), CHAT_TIMEOUT_MS)
+      ),
+    ]);
+  } catch {
+    return null;
+  }
+}
+
 function resolveLocationPhrase(
   parsed: ReturnType<typeof parseUserQuery>,
   query: string,
@@ -78,6 +127,12 @@ function resolveLocationPhrase(
 
 function generalReply(query: string): string {
   const q = query.toLowerCase();
+  if (/^(thanks|thank you|ty|ok|okay|cool|great|nice|got it)\b/.test(q.trim())) {
+    return "You're welcome. Tell me what you want to do next, and I'll help.";
+  }
+  if (/^(hi|hello|hey|namaste)\b/i.test(q.trim())) {
+    return "Hi! I can chat normally, or help you find and book Bangalore salons when you need.";
+  }
   if (/\b(price|cost|how much|expensive|cheap)\b/.test(q)) {
     return "Partners range from about ₹400 to ₹15,000 depending on service. Try: “hydrafacial under ₹5000 in HSR Layout”.";
   }
@@ -113,6 +168,12 @@ export async function POST(req: NextRequest) {
     }
 
     const parsed = parseUserQuery(query);
+    if (isConversationalQuery(parsed, query)) {
+      const response =
+        (await chatLikeAssistant(query, messageList)) || generalReply(query);
+      return NextResponse.json({ type: "text", response });
+    }
+
     const salons = await getSalonsCached();
 
     if (salons.length === 0) {
