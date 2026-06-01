@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
 
     const salons = await getSalonsCached();
     if (salons.length === 0) {
+      console.error("[AGENT] No salons found in cache/DB");
       return NextResponse.json({
         type: "text",
         response: "I'm having trouble connecting to the marketplace. Please try again in a moment.",
@@ -88,9 +89,11 @@ export async function POST(req: NextRequest) {
     }
 
     // --- AI FIRST FLOW ---
+    console.log(`[AGENT] Processing query: "${userQuery}"`);
     const ai = await unifiedAgentResponse(userQuery, messageList, salons);
 
     if (!ai) {
+      console.warn("[AGENT] AI failed or returned null. Check API keys and AGENT_USE_LLM variable.");
       // Fallback if AI fails
       const parsed = parseUserQuery(userQuery);
       return NextResponse.json({
