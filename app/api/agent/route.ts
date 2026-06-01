@@ -1,3 +1,7 @@
+/** 
+ * Agent API Route - Optimized for Groq + Google Places + MongoDB
+ * Build Trigger: 2026-06-02T23:30:00Z 
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { getAgentUserId } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
