@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Salon not found" }, { status: 404 });
     }
     
-    const realService = salon.services.find(s => s.name === body.service.name);
+    const realService = (salon.services as any[]).find((s: any) => s.name === body.service.name);
     if (!realService) {
       return NextResponse.json({ error: "Service not found" }, { status: 400 });
     }
