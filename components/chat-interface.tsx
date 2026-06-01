@@ -113,7 +113,10 @@ export function ChatInterface() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: content, messages: history }),
       });
-      const data = await res.json();
+      const contentType = res.headers.get("content-type") || "";
+      const data = contentType.includes("application/json")
+        ? await res.json()
+        : { error: await res.text() };
 
       if (!res.ok) {
         const errText =
@@ -146,7 +149,7 @@ export function ChatInterface() {
           id: newId(),
           role: "assistant",
           content:
-            "Could not reach the agent. Check your connection or browse /salons.",
+            "Could not reach the agent. Check your connection or browse the salon marketplace.",
         },
       ]);
     } finally {

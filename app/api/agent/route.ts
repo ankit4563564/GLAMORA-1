@@ -93,47 +93,48 @@ function generalReply(query: string): string {
 }
 
 export async function POST(req: NextRequest) {
-  const userId = await getAgentUserId();
+  try {
+    const userId = await getAgentUserId();
 
-  const body = await req.json();
-  const directQuery =
-    typeof body.query === "string" ? body.query.trim() : "";
-  const messageList = Array.isArray(body.messages) ? body.messages : [];
-  const lastUser = [...messageList]
-    .reverse()
-    .find((m: { role?: string }) => m?.role === "user");
-  const fromHistory =
-    typeof lastUser?.content === "string"
-      ? lastUser.content.trim()
-      : typeof lastUser?.text === "string"
-        ? lastUser.text.trim()
-        : "";
-  const query = directQuery || fromHistory;
-  if (!query) {
-    return NextResponse.json({ error: "Message required" }, { status: 400 });
-  }
+    const body = await req.json();
+    const directQuery =
+      typeof body.query === "string" ? body.query.trim() : "";
+    const messageList = Array.isArray(body.messages) ? body.messages : [];
+    const lastUser = [...messageList]
+      .reverse()
+      .find((m: { role?: string }) => m?.role === "user");
+    const fromHistory =
+      typeof lastUser?.content === "string"
+        ? lastUser.content.trim()
+        : typeof lastUser?.text === "string"
+          ? lastUser.text.trim()
+          : "";
+    const query = directQuery || fromHistory;
+    if (!query) {
+      return NextResponse.json({ error: "Message required" }, { status: 400 });
+    }
 
-  const parsed = parseUserQuery(query);
-  const salons = await getSalonsCached();
+    const parsed = parseUserQuery(query);
+    const salons = await getSalonsCached();
 
-  if (salons.length === 0) {
-    return NextResponse.json({
-      type: "text",
-      response:
-        "Could not load salons. Check MONGODB_URI or visit /api/seed once.",
-    });
-  }
+    if (salons.length === 0) {
+      return NextResponse.json({
+        type: "text",
+        response:
+          "Could not load salons. Check MONGODB_URI or visit /api/seed once.",
+      });
+    }
 
-  let geminiFilters: Record<string, string | number> = {};
-  let geminiResponse = "";
-  let geminiIntent = parsed.intent;
+    let geminiFilters: Record<string, string | number> = {};
+    let geminiResponse = "";
+    let geminiIntent = parsed.intent;
 
-  if (needsLlm(parsed, query)) {
-    const llm = await parseWithLlm(query, salons);
-    if (llm?.intent) geminiIntent = llm.intent as typeof parsed.intent;
-    if (llm?.filters) geminiFilters = llm.filters;
-    if (llm?.response) geminiResponse = llm.response;
-  }
+    if (needsLlm(parsed, query)) {
+      const llm = await parseWithLlm(query, salons);
+      if (llm?.intent) geminiIntent = llm.intent as typeof parsed.intent;
+      if (llm?.filters) geminiFilters = llm.filters;
+      if (llm?.response) geminiResponse = llm.response;
+    }
 
   const locationPhrase = resolveLocationPhrase(
     parsed,
@@ -272,8 +273,19 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  return NextResponse.json({
-    type: "text",
-    response: geminiResponse || generalReply(query),
-  });
+    return NextResponse.json({
+      type: "text",
+      response: geminiResponse || generalReply(query),
+    });
+  } catch (error) {
+    console.error("Agent route failed", error);
+    return NextResponse.json(
+      {
+        type: "text",
+        response:
+          "I could not reach the concierge engine just now. The salon marketplace is still available while I recover.",
+      },
+      { status: 200 }
+    );
+  }
 }
