@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { getUserId } from "@/lib/auth";
 import { isClerkConfigured } from "@/lib/clerk-config";
-import { getMarketingModel } from "@/lib/gemini";
+import { completeText, isTextLlmConfigured } from "@/lib/llm";
 
 export const dynamic = "force-dynamic";
 
@@ -30,12 +30,17 @@ export async function POST(req: NextRequest) {
 
   const { prompt, channel } = await req.json();
 
+  if (!isTextLlmConfigured()) {
+    return NextResponse.json({ copies: FALLBACK });
+  }
+
   try {
-    const model = getMarketingModel();
-    const result = await model.generateContent(
-      `Generate exactly 3 distinct high-converting ${channel} marketing copy variations for a premium Bangalore salon. Promotion: ${prompt}. Return ONLY a JSON array of 3 strings, no markdown.`
-    );
-    const text = result.response.text();
+    const text = await completeText({
+      system:
+        "You write premium Bangalore salon marketing copy. Return ONLY a JSON array of 3 strings.",
+      user: `Generate exactly 3 distinct high-converting ${channel} captions. Promotion: ${prompt}. No markdown.`,
+      maxTokens: 600,
+    });
     const match = text.match(/\[[\s\S]*\]/);
     if (match) {
       const copies = JSON.parse(match[0]);

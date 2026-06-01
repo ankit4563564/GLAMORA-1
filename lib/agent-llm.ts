@@ -1,4 +1,4 @@
-import { getAgentModel } from "@/lib/gemini";
+import { completeText, isTextLlmConfigured } from "@/lib/llm";
 import type { SalonDoc } from "@/lib/salons";
 
 export type LlmParseResult = {
@@ -7,17 +7,18 @@ export type LlmParseResult = {
   response?: string;
 };
 
-const SYSTEM = `Bangalore salon assistant. Reply ONLY JSON:
-{"intent":"search"|"book"|"check_slots"|"recommend"|"general","filters":{"area":string|null,"maxPrice":number|null,"service":string|null,"salonName":string|null},"response":"one short sentence"}`;
+const SYSTEM = `You are Glamora's Bangalore salon booking assistant. Reply ONLY with valid JSON, no markdown:
+{"intent":"search"|"book"|"check_slots"|"recommend"|"general","filters":{"area":string|null,"maxPrice":number|null,"service":string|null,"salonName":string|null},"response":"one short friendly sentence"}`;
 
-const LLM_TIMEOUT_MS = 2_500;
+const LLM_TIMEOUT_MS = 4_000;
 
-/** Optional slow path — only for ambiguous queries when enabled. */
+/** Uses Groq when GROQ_API_KEY is set, otherwise Gemini. Skipped if AGENT_USE_LLM=false. */
 export async function parseWithLlm(
   query: string,
   salons: SalonDoc[]
 ): Promise<LlmParseResult | null> {
   if (process.env.AGENT_USE_LLM === "false") return null;
+  if (!isTextLlmConfigured()) return null;
 
   const context = salons
     .slice(0, 10)
@@ -25,11 +26,12 @@ export async function parseWithLlm(
     .join("; ");
 
   const work = (async () => {
-    const model = getAgentModel();
-    const result = await model.generateContent(
-      `${SYSTEM}\nPartners: ${context}\nUser: ${query}`
-    );
-    const text = result.response.text();
+    const text = await completeText({
+      system: SYSTEM,
+      user: `Partners: ${context}\nUser: ${query}`,
+      maxTokens: 256,
+      temperature: 0.2,
+    });
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return null;
     return JSON.parse(match[0]) as LlmParseResult;
@@ -45,4 +47,11 @@ export async function parseWithLlm(
   } catch {
     return null;
   }
+}
+
+/** True when Groq or Gemini can power optional agent LLM enrichment. */
+export function isAgentLlmAvailable(): boolean {
+  return (
+    process.env.AGENT_USE_LLM !== "false" && isTextLlmConfigured()
+  );
 }
