@@ -50,6 +50,12 @@ function findSalonInQuery(query: string, salons: SalonDoc[]): SalonDoc | undefin
 function needsLlm(parsed: ReturnType<typeof parseUserQuery>, query: string): boolean {
   if (process.env.AGENT_USE_LLM === "false") return false;
   if (!isTextLlmConfigured()) return false;
+  
+  // If user mentioned a location NOT in Bangalore, we definitely need LLM to explain nicely
+  if (parsed.locationPhrase && !isKnownLocationPhrase(parsed.locationPhrase)) {
+    return true;
+  }
+
   if (parsed.isDiscovery || parsed.intent === "search" || parsed.intent === "recommend") {
     return false;
   }

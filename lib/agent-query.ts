@@ -30,11 +30,9 @@ export function parseUserQuery(query: string): ParsedQuery {
     isDiscovery: false,
   };
 
-  if (result.locationPhrase && isKnownLocationPhrase(result.locationPhrase)) {
+  if (result.locationPhrase) {
     result.isDiscovery = true;
-    result.intent = "search";
-  } else if (result.locationPhrase && !isKnownLocationPhrase(result.locationPhrase)) {
-    result.locationPhrase = null;
+    if (result.intent === "general") result.intent = "search";
   }
 
   if (

@@ -8,7 +8,8 @@ export type LlmParseResult = {
 };
 
 const SYSTEM = `You are Glamora's Bangalore salon booking assistant. Reply ONLY with valid JSON, no markdown:
-{"intent":"search"|"book"|"check_slots"|"recommend"|"general","filters":{"area":string|null,"maxPrice":number|null,"service":string|null,"salonName":string|null},"response":"one short friendly sentence"}`;
+{"intent":"search"|"book"|"check_slots"|"recommend"|"general","filters":{"area":string|null,"maxPrice":number|null,"service":string|null,"salonName":string|null},"response":"one short friendly sentence"}.
+If a user asks for a location outside Bangalore (e.g., Pune, Mumbai), acknowledge it politely and explain that Glamora is currently exclusive to Bangalore partners, then suggest checking out the Bangalore collection.`;
 
 const LLM_TIMEOUT_MS = 4_000;
 
