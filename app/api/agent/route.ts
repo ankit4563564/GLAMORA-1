@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserId } from "@/lib/auth";
+import { getAgentUserId } from "@/lib/auth";
 import { parseWithLlm } from "@/lib/agent-llm";
 import { parseUserQuery } from "@/lib/agent-query";
 import { getSalonsCached } from "@/lib/salon-cache";
@@ -9,6 +9,7 @@ import { Booking } from "@/models/Booking";
 import { generateBookingId } from "@/lib/utils";
 import {
   extractLocationPhrase,
+  isKnownLocationPhrase,
   searchSalonsByLocation,
   buildLocationResponse,
 } from "@/lib/location-search";
@@ -33,12 +34,13 @@ function findSalonInQuery(query: string, salons: SalonDoc[]): SalonDoc | undefin
   const q = query.toLowerCase();
   const exact = salons.find((s) => q.includes(s.name.toLowerCase()));
   if (exact) return exact;
+
   return salons.find((s) =>
     s.name
       .toLowerCase()
       .split(/\s+/)
-      .filter((w) => w.length > 3)
-      .some((w) => q.includes(w))
+      .filter((w) => w.length > 4)
+      .some((w) => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(q))
   );
 }
 
@@ -55,11 +57,39 @@ function needsLlm(parsed: ReturnType<typeof parseUserQuery>, query: string): boo
   return parsed.intent === "general" && query.length > 120;
 }
 
-export async function POST(req: NextRequest) {
-  const userId = await getUserId();
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+function resolveLocationPhrase(
+  parsed: ReturnType<typeof parseUserQuery>,
+  query: string,
+  geminiArea?: string
+): string | null {
+  const candidates = [
+    parsed.locationPhrase,
+    geminiArea || null,
+    extractLocationPhrase(query),
+  ].filter(Boolean) as string[];
+
+  for (const phrase of candidates) {
+    if (isKnownLocationPhrase(phrase)) return phrase;
   }
+  return null;
+}
+
+function generalReply(query: string): string {
+  const q = query.toLowerCase();
+  if (/\b(price|cost|how much|expensive|cheap)\b/.test(q)) {
+    return "Partners range from about ₹400 to ₹15,000 depending on service. Try: “hydrafacial under ₹5000 in HSR Layout”.";
+  }
+  if (/\b(hour|timing|open|close|when)\b/.test(q)) {
+    return "Most lounges run 10 AM – 8 PM. Name an area and service to see live-style slots on the book page.";
+  }
+  if (/\b(help|what can you|how do)\b/.test(q)) {
+    return "I find Bangalore salons by area, service, and budget — and can demo-book when you name a lounge. Example: “bridal makeup in Indiranagar”.";
+  }
+  return 'Share an area or service — e.g. "fade under ₹1200 in Koramangala" or "spas near Whitefield".';
+}
+
+export async function POST(req: NextRequest) {
+  const userId = await getAgentUserId();
 
   const { messages } = await req.json();
   const lastUser = [...messages]
@@ -92,10 +122,11 @@ export async function POST(req: NextRequest) {
     if (llm?.response) geminiResponse = llm.response;
   }
 
-  const locationPhrase =
-    parsed.locationPhrase ||
-    (geminiFilters.area ? String(geminiFilters.area) : null) ||
-    extractLocationPhrase(query);
+  const locationPhrase = resolveLocationPhrase(
+    parsed,
+    query,
+    geminiFilters.area ? String(geminiFilters.area) : undefined
+  );
 
   const maxPrice =
     parsed.maxPrice ??
@@ -105,16 +136,18 @@ export async function POST(req: NextRequest) {
     parsed.service ||
     (geminiFilters.service ? String(geminiFilters.service) : undefined);
 
+  const wantsBook =
+    (parsed.intent === "book" || geminiIntent === "book") &&
+    /\b(book|reserve|appointment|schedule)\b/i.test(query);
+
   const isDiscovery =
     parsed.isDiscovery ||
-    Boolean(locationPhrase) ||
+    parsed.intent === "check_slots" ||
     geminiIntent === "search" ||
     geminiIntent === "recommend" ||
-    /\b(suggest|find|recommend|salon|near|budget|live|where|location)\b/i.test(
-      query
-    );
+    Boolean(locationPhrase);
 
-  if (geminiIntent === "book" || parsed.intent === "book") {
+  if (wantsBook) {
     const salon =
       findSalonInQuery(query, salons) ||
       (geminiFilters.salonName
@@ -169,6 +202,19 @@ export async function POST(req: NextRequest) {
         },
       });
     }
+
+    return NextResponse.json({
+      type: "text",
+      response: `Which lounge should I book? For example: "Book a fade at The Groom Room tomorrow at 11 AM".`,
+    });
+  }
+
+  if (parsed.intent === "check_slots" || geminiIntent === "check_slots") {
+    const area = locationPhrase || "Bangalore";
+    return NextResponse.json({
+      type: "text",
+      response: `Typical slots near ${area} are 10 AM – 7 PM. Pick a lounge below to see bookable times.`,
+    });
   }
 
   if (isDiscovery) {
@@ -215,8 +261,6 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     type: "text",
-    response:
-      geminiResponse ||
-      'Tell me your area in Bangalore — e.g. "salons near Marathahalli under ₹5000".',
+    response: geminiResponse || generalReply(query),
   });
 }

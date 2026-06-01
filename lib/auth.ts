@@ -13,3 +13,9 @@ export async function getUserId(): Promise<string | null> {
     return null;
   }
 }
+
+/** Agent works on the public /agent page — allow guests when Clerk has no session. */
+export async function getAgentUserId(): Promise<string> {
+  const userId = await getUserId();
+  return userId ?? DEMO_USER_ID;
+}

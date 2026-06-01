@@ -2,9 +2,16 @@
 
 import {
   extractLocationPhrase,
+  isKnownLocationPhrase,
   PARTNER_AREAS,
   resolvePartnerAreas,
 } from "./location-search";
+
+function hasWord(q: string, word: string): boolean {
+  return new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(
+    q
+  );
+}
 
 export type ParsedQuery = {
   intent: "search" | "book" | "check_slots" | "recommend" | "general";
@@ -23,9 +30,11 @@ export function parseUserQuery(query: string): ParsedQuery {
     isDiscovery: false,
   };
 
-  if (result.locationPhrase) {
+  if (result.locationPhrase && isKnownLocationPhrase(result.locationPhrase)) {
     result.isDiscovery = true;
     result.intent = "search";
+  } else if (result.locationPhrase && !isKnownLocationPhrase(result.locationPhrase)) {
+    result.locationPhrase = null;
   }
 
   if (
@@ -36,7 +45,7 @@ export function parseUserQuery(query: string): ParsedQuery {
   } else if (/\b(slot|available|open|free)\b/.test(q)) {
     result.intent = "check_slots";
   } else if (
-    /\b(find|suggest|recommend|near|budget|salon|spa|facial|haircut|fade|bridal|groom|live|located|where)\b/.test(
+    /\b(find|suggest|recommend|near|budget|salon|salons|spa|facial|haircut|fade|bridal|live|located|where|show|list)\b/.test(
       q
     )
   ) {
@@ -78,7 +87,7 @@ export function parseUserQuery(query: string): ParsedQuery {
     "nail",
   ];
   for (const s of services) {
-    if (q.includes(s)) {
+    if (hasWord(q, s)) {
       result.service = s;
       result.isDiscovery = true;
       if (result.intent === "general") result.intent = "search";

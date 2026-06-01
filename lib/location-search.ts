@@ -59,13 +59,27 @@ export const PARTNER_AREAS = [
   "Electronic City",
 ];
 
-/** Pull a location phrase from natural language */
+/** True when phrase maps to a Bangalore partner area or known locality alias. */
+export function isKnownLocationPhrase(phrase: string | null): boolean {
+  if (!phrase || phrase.trim().length < 3) return false;
+  const norm = phrase.toLowerCase().trim();
+  if (resolvePartnerAreas(phrase).length > 0) return true;
+  for (const key of Object.keys(LOCALITY_TO_PARTNERS)) {
+    if (norm.includes(key) || key.includes(norm)) return true;
+  }
+  return PARTNER_AREAS.some(
+    (area) =>
+      norm.includes(area.toLowerCase()) || area.toLowerCase().includes(norm)
+  );
+}
+
+/** Pull a location phrase from natural language (strict — avoids "interested in X" false positives). */
 export function extractLocationPhrase(query: string): string | null {
   const q = query.trim();
   const patterns = [
     /\b(?:near|around|close to)\s+([a-z0-9][a-z0-9\s.'-]{1,40})/i,
-    /\b(?:in|at|from)\s+([a-z0-9][a-z0-9\s.'-]{1,40})/i,
     /\b(?:live|stay|located)\s+(?:in|at|near)\s+([a-z0-9][a-z0-9\s.'-]{1,40})/i,
+    /\b(?:in|at)\s+([a-z][a-z0-9\s.'-]{2,35})\b/i,
     /\b([a-z0-9][a-z0-9\s.'-]{2,30})\s+(?:area|locality|side)\b/i,
   ];
 
@@ -76,7 +90,7 @@ export function extractLocationPhrase(query: string): string | null {
         .replace(/\b(bangalore|bengaluru|ka|karnataka)\b/gi, "")
         .replace(/\b(salon|salons|spa|budget|please|suggest|recommend|find)\b/gi, "")
         .trim();
-      if (phrase.length >= 3) return phrase;
+      if (phrase.length >= 3 && isKnownLocationPhrase(phrase)) return phrase;
     }
   }
 

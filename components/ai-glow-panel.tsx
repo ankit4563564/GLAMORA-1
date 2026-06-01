@@ -16,7 +16,7 @@ export function AIGlowPanel({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
       className={cn(
-        "relative rounded-2xl border border-violet-500/25 bg-[#1A1C29]/70 p-1 shadow-ai-glow backdrop-blur-md",
+        "relative overflow-hidden rounded-2xl border border-violet-500/25 bg-[#1A1C29]/70 shadow-ai-glow backdrop-blur-md",
         className
       )}
     >
@@ -27,7 +27,7 @@ export function AIGlowPanel({
             "linear-gradient(135deg, rgba(124,58,237,0.2), transparent 40%, rgba(34,211,238,0.15))",
         }}
       />
-      <div className="relative">{children}</div>
+      <div className="relative flex min-h-0 h-full w-full flex-col">{children}</div>
     </motion.div>
   );
 }
