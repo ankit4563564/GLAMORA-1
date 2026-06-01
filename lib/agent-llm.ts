@@ -47,7 +47,10 @@ export async function unifiedAgentResponse(
   salons: SalonDoc[]
 ): Promise<LlmParseResult | null> {
   if (process.env.AGENT_USE_LLM === "false") return null;
-  if (!isTextLlmConfigured()) return null;
+  if (!isTextLlmConfigured()) {
+    console.warn("[AI-ENGINE] LLM not configured (missing keys)");
+    return null;
+  }
 
   const context = salons
     .slice(0, 15)

@@ -66,12 +66,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         type: "text",
         response: "Wait a moment... I'm thinking about your previous request!",
-      }, { status: 429 });
+      }, { status: 200 }); // Return 200 to show message in chat bubble
     }
 
-    const body = await req.json();
-    const query = (typeof body.query === "string" ? body.query : "").trim();
-    const messageList = Array.isArray(body.messages) ? body.messages : [];
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+    
+    const query = (typeof body?.query === "string" ? body.query : "").trim();
+    const messageList = Array.isArray(body?.messages) ? body.messages : [];
     
     if (!query && messageList.length === 0) {
       return NextResponse.json({ error: "Message required" }, { status: 400 });
