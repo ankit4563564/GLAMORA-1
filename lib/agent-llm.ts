@@ -2,53 +2,93 @@ import { completeText, isTextLlmConfigured } from "@/lib/llm";
 import type { SalonDoc } from "@/lib/salons";
 
 export type LlmParseResult = {
-  intent?: string;
-  filters?: Record<string, string | number>;
-  response?: string;
+  intent: "search" | "book" | "check_slots" | "recommend" | "general";
+  filters?: {
+    area?: string | null;
+    maxPrice?: number | null;
+    service?: string | null;
+    salonName?: string | null;
+    time?: string | null;
+    date?: string | null;
+  };
+  message: string;
 };
 
-const SYSTEM = `You are Glamora's Bangalore salon booking assistant. Reply ONLY with valid JSON, no markdown:
-{"intent":"search"|"book"|"check_slots"|"recommend"|"general","filters":{"area":string|null,"maxPrice":number|null,"service":string|null,"salonName":string|null},"response":"one short friendly sentence"}.
-If a user asks for a location outside Bangalore (e.g., Pune, Mumbai), acknowledge it politely and explain that Glamora is currently exclusive to Bangalore partners, then suggest checking out the Bangalore collection.`;
+const SYSTEM_CONCIERGE = `You are the Glamora AI Concierge, a sophisticated, helpful, and friendly beauty assistant for Bangalore. 
 
-const LLM_TIMEOUT_MS = 4_000;
+YOUR PERSONA:
+- You speak like a professional concierge at a luxury spa.
+- You are knowledgeable about beauty, skincare, and hair trends.
+- You are conversational and never robotic. You can answer general questions, give beauty tips, and acknowledge feelings.
 
-/** Uses Gemini Flash by default. Skipped if AGENT_USE_LLM=false. */
-export async function parseWithLlm(
+YOUR TASKS:
+1. CONVERSE: Respond naturally to the user's query. If they ask for advice, give detailed, helpful beauty tips.
+2. ANALYZE INTENT: Determine if the user wants to "search" for salons, "book" an appointment, "check_slots", or just "recommend" something.
+3. EXTRACT FILTERS: Identify area, maxPrice (number only), service, salonName, date, and time.
+4. BANGALORE FOCUS: Glamora is currently ONLY in Bangalore. If they ask for Pune, Mumbai, etc., acknowledge it warmly, explain we are Bangalore-only for now, and suggest they see our Bangalore partners.
+
+RESPONSE FORMAT:
+You MUST reply ONLY with valid JSON (no markdown):
+{
+  "intent": "search" | "book" | "check_slots" | "recommend" | "general",
+  "filters": { "area": string | null, "maxPrice": number | null, "service": string | null, "salonName": string | null, "time": string | null, "date": string | null },
+  "message": "Your natural, conversational, and helpful response to the user."
+}`;
+
+const LLM_TIMEOUT_MS = 8_000;
+
+/** 
+ * Unified ChatGPT-style agent. 
+ * Handles both conversation and intent parsing with history.
+ */
+export async function unifiedAgentResponse(
   query: string,
+  history: Array<{ role: string; content: string }>,
   salons: SalonDoc[]
 ): Promise<LlmParseResult | null> {
   if (process.env.AGENT_USE_LLM === "false") return null;
   if (!isTextLlmConfigured()) return null;
 
   const context = salons
-    .slice(0, 10)
+    .slice(0, 15)
     .map((s) => `${s.name}@${s.area}`)
     .join("; ");
 
+  const chatHistory = history
+    .slice(-6)
+    .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+    .join("\n");
+
   const work = (async () => {
     const text = await completeText({
-      system: SYSTEM,
-      user: `### CONTEXT (BANGALORE PARTNERS)
+      system: SYSTEM_CONCIERGE,
+      user: `### BANGALORE PARTNERS
 ${context}
 
-### USER QUERY
-"${query.replace(/"/g, "'")}"
+### CONVERSATION HISTORY
+${chatHistory || "No prior conversation."}
 
-### INSTRUCTION
-Analyze the query against the context and return the JSON.`,
-      maxTokens: 256,
-      temperature: 0.2,
+### CURRENT USER QUERY
+"${query}"
+
+### FINAL INSTRUCTION
+Provide a helpful, conversational response and the structured intent JSON.`,
+      maxTokens: 512,
+      temperature: 0.3,
     });
     
-    // Robust parsing: search for JSON block
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
     
     try {
-      return JSON.parse(jsonMatch[0]) as LlmParseResult;
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        intent: parsed.intent || "general",
+        filters: parsed.filters || {},
+        message: parsed.message || "How else can I help you today?"
+      };
     } catch (e) {
-      console.warn("LLM returned invalid JSON:", text);
+      console.error("Agent JSON parse failed:", e, text);
       return null;
     }
   })();
@@ -60,7 +100,8 @@ Analyze the query against the context and return the JSON.`,
         setTimeout(() => reject(new Error("timeout")), LLM_TIMEOUT_MS)
       ),
     ]);
-  } catch {
+  } catch (err) {
+    console.error("Agent LLM timeout or error:", err);
     return null;
   }
 }
