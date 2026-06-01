@@ -20,7 +20,12 @@ export async function GET(req: NextRequest) {
       search: searchParams.get("search") || undefined,
     });
     return NextResponse.json({ salons });
-  } catch {
-    return NextResponse.json({ salons: seedFallbackSalons() });
+  } catch (err) {
+    console.error("Failed to fetch salons from DB:", err);
+    return NextResponse.json({ 
+      salons: seedFallbackSalons(),
+      isDemo: true,
+      error: "Database connection failed. Showing demo data."
+    });
   }
 }

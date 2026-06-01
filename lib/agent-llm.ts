@@ -28,13 +28,28 @@ export async function parseWithLlm(
   const work = (async () => {
     const text = await completeText({
       system: SYSTEM,
-      user: `Partners: ${context}\nUser: ${query}`,
+      user: `### CONTEXT (BANGALORE PARTNERS)
+${context}
+
+### USER QUERY
+"${query.replace(/"/g, "'")}"
+
+### INSTRUCTION
+Analyze the query against the context and return the JSON.`,
       maxTokens: 256,
       temperature: 0.2,
     });
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    return JSON.parse(match[0]) as LlmParseResult;
+    
+    // Robust parsing: search for JSON block
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+    
+    try {
+      return JSON.parse(jsonMatch[0]) as LlmParseResult;
+    } catch (e) {
+      console.warn("LLM returned invalid JSON:", text);
+      return null;
+    }
   })();
 
   try {

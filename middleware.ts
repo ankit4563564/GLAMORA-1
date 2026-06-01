@@ -15,7 +15,6 @@ const isPublic = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/salons(.*)",
-  "/api/seed(.*)",
   "/api/agent(.*)",
   "/api/beauty-ai(.*)",
 ]);

@@ -48,9 +48,14 @@ export async function POST(req: NextRequest) {
     const text = result.response.text();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      analysis = JSON.parse(jsonMatch[0]);
+      try {
+        analysis = JSON.parse(jsonMatch[0]);
+      } catch (e) {
+        console.warn("Beauty AI invalid JSON response:", text);
+      }
     }
-  } catch {
+  } catch (err) {
+    console.error("Beauty AI failed:", err);
     analysis = BEAUTY_AI_FALLBACK;
   }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAgentUserId } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
 import { parseWithLlm } from "@/lib/agent-llm";
 import { completeText, isTextLlmConfigured } from "@/lib/llm";
 import { parseUserQuery } from "@/lib/agent-query";

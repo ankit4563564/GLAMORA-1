@@ -272,5 +272,13 @@ export function buildLocationResponse(
     result.partnerAreas.length > 0
       ? result.partnerAreas.join(", ")
       : "central Bangalore";
+
+  // Check if it's a known city or area outside Bangalore
+  const isOutSideBangalore = ["pune", "mumbai", "delhi", "chennai", "hyderabad", "kolkata", "gurgaon", "noida"].some(city => loc.toLowerCase().includes(city));
+
+  if (isOutSideBangalore) {
+    return `Glamora currently curates lounges exclusively in Bangalore. While we haven't reached ${loc} yet, here are our top premium partners in Bangalore.`;
+  }
+
   return `No studio directly in "${loc}" — showing ${count} closest premium partners near ${nearest}${budget}.`;
 }

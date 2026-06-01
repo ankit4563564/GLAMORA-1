@@ -9,8 +9,16 @@ export const dynamic = "force-dynamic";
 /** GET /api/seed — idempotent seed. Add ?force=1 to refresh salon data/images. */
 export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const force = searchParams.get("force") === "1";
+    const secret = searchParams.get("secret");
+
+    // Basic hackathon protection: check for a secret key
+    if (process.env.SEED_SECRET && secret !== process.env.SEED_SECRET) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     await connectDB();
-    const force = new URL(req.url).searchParams.get("force") === "1";
     const count = await Salon.countDocuments();
     if (count >= 10 && !force) {
       return NextResponse.json({ message: "Already seeded", count });
