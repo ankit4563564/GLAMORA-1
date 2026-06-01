@@ -77,16 +77,11 @@ Provide a helpful, conversational response and the structured intent JSON.`,
       temperature: 0.3,
     });
     
-    console.log("[AI-ENGINE] Raw response received");
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error("[AI-ENGINE] No JSON found in response:", text);
-      return null;
-    }
+    if (!jsonMatch) return null;
     
     try {
       const parsed = JSON.parse(jsonMatch[0]);
-      console.log(`[AI-ENGINE] Parsed intent: ${parsed.intent}`);
       return {
         intent: parsed.intent || "general",
         filters: parsed.filters || {},
