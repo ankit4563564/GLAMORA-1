@@ -64,19 +64,17 @@ export async function POST(req: NextRequest) {
     }
     const analysis = JSON.parse(jsonMatch[0]);
 
-    // Step 2: Generate Edited Image using Replicate + Flux Kontext
-    // Using a reliable Flux-based image-to-image or inpainting model
+    // Step 2: Generate Edited Image using Replicate + Flux Dev (Img2Img)
     const output = await replicate.run(
-      "lucataco/flux-dev-multi-controlnet:85d68d7a12b972e6b206f477e31b6976722d36489375d038234149864d42065b",
+      "black-forest-labs/flux-dev",
       {
         input: {
           prompt: `A high-quality, photorealistic beauty industry portrait of the same person with a ${analysis.recommendedHairstyle}. Preserve the exact facial features, identity, expression, clothing, and background. Only modify the hair to match the requested style. Studio lighting, professional salon makeover finish.`,
           image: image,
-          control_image: image,
-          controlnet_type: "depth", // Depth helps preserve the head shape and background
-          controlnet_conditioning_scale: 0.5,
-          num_inference_steps: 30,
+          prompt_strength: 0.7, // High enough to change hair, low enough to keep face
+          num_inference_steps: 28,
           guidance_scale: 3.5,
+          output_format: "webp",
         }
       }
     );
