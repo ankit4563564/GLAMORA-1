@@ -20,12 +20,19 @@ function CountUp({ end, suffix = "" }: { end: number; suffix?: string }) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const obs = new IntersectionObserver(
-      ([e]) => e.isIntersecting && setStarted(true),
-      { threshold: 0.5 }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setStarted(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1 }
     );
-    obs.observe(el);
-    return () => obs.disconnect();
+
+    observer.observe(el);
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {

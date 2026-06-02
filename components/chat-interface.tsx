@@ -38,7 +38,7 @@ type BookingPayload = {
 };
 
 const SUGGESTIONS = [
-  "Find me a premium spa in Pune city",
+  "Find me a premium spa in Bangalore",
   "Check Indiranagar bridal slots",
   "Who does advanced hydrafacials in HSR Layout?",
   "Book a haircut at Luxe Hair Lounge for tomorrow at 11 AM",

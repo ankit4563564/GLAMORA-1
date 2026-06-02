@@ -37,6 +37,7 @@ type Analysis = {
 type InputMode = "choose" | "camera" | "preview";
 
 export function BeautyAIUpload() {
+  const [consent, setConsent] = useState(false);
   const [mode, setMode] = useState<InputMode>("choose");
   const [preview, setPreview] = useState<string | null>(null);
   const [stepIndex, setStepIndex] = useState(-1);
@@ -76,12 +77,17 @@ export function BeautyAIUpload() {
   }, []);
 
   function startWithImage(dataUrl: string) {
+    if (!consent) return;
     setPreview(dataUrl);
     setMode("preview");
     runAnalysis(dataUrl);
   }
 
   function onFile(file: File) {
+    if (!consent) {
+      alert("Please accept the privacy consent first.");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => startWithImage(reader.result as string);
     reader.readAsDataURL(file);
@@ -97,7 +103,35 @@ export function BeautyAIUpload() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-8">
-      {mode === "choose" && !preview && (
+      {!consent && (
+        <div className="glass-card p-6 text-center border-violet-500/30 bg-violet-500/5">
+          <h2 className="font-display text-xl text-cream">Privacy Consent</h2>
+          <p className="mt-2 text-sm text-cream-muted">
+            BeautyAI uses facial analysis to recommend grooming styles. Your image is processed securely and is not stored permanently on our servers.
+          </p>
+          <div className="mt-4 flex items-center justify-center gap-3">
+            <input 
+              type="checkbox" 
+              id="privacy" 
+              className="h-4 w-4 rounded border-white/20 bg-white/5 text-violet-500 focus:ring-violet-500" 
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+            />
+            <label htmlFor="privacy" className="text-sm text-cream cursor-pointer">
+              I agree to the processing of my facial data
+            </label>
+          </div>
+          <Button 
+            className="mt-6" 
+            disabled={!consent}
+            onClick={() => setConsent(true)}
+          >
+            Enter BeautyAI
+          </Button>
+        </div>
+      )}
+
+      {consent && mode === "choose" && !preview && (
         <div className="grid gap-4 sm:grid-cols-2">
           <label
             className="flex min-h-[260px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-violet-500/40 bg-[#1A1C29]/50 p-8 backdrop-blur transition-all hover:scale-[1.01] hover:border-cyan-400/50 hover:bg-violet-500/5"
@@ -134,7 +168,7 @@ export function BeautyAIUpload() {
         </div>
       )}
 
-      {mode === "camera" && !preview && (
+      {consent && mode === "camera" && !preview && (
         <BeautyAICamera
           onCapture={startWithImage}
           onClose={() => setMode("choose")}
@@ -153,6 +187,12 @@ export function BeautyAIUpload() {
                   className="object-cover"
                   unoptimized
                 />
+                {analyzing && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
+                    <p className="mt-2 text-[10px] uppercase tracking-widest text-cyan-400">Processing</p>
+                  </div>
+                )}
               </div>
               {stepIndex >= 0 && (
                 <div className="space-y-2">

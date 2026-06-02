@@ -33,12 +33,14 @@ type Salon = (typeof SEED_SALONS)[0] & {
 };
 
 export default function SalonDetailPage({ params }: { params: { id: string } }) {
+  const [mounted, setMounted] = useState(false);
   const [salon, setSalon] = useState<Salon | null>(null);
   const [tab, setTab] = useState("overview");
   const [slide, setSlide] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setMounted(true);
     const idx = params.id.startsWith("seed-")
       ? parseInt(params.id.replace("seed-", ""), 10)
       : -1;
@@ -57,6 +59,7 @@ export default function SalonDetailPage({ params }: { params: { id: string } }) 
         const found = d.salons?.find((s: Salon) => s._id === params.id);
         setSalon(found || null);
       })
+      .catch(() => setSalon(null))
       .finally(() => setLoading(false));
   }, [params.id]);
 
@@ -69,7 +72,7 @@ export default function SalonDetailPage({ params }: { params: { id: string } }) 
     return () => clearInterval(t);
   }, [salon]);
 
-  if (loading) {
+  if (!mounted || loading) {
     return (
       <div className="mx-auto max-w-6xl space-y-4 px-4 py-10">
         <Skeleton className="h-80 rounded-2xl" />

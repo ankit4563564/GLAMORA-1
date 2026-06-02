@@ -15,19 +15,19 @@ export function BookingFlow({
 }: {
   salon: SalonCardData & { services: Service[]; availableSlots: string[] };
 }) {
-  const [step, setStep] = useState(1);
-  const [service, setService] = useState<Service | null>(null);
-  const [dateKey, setDateKey] = useState("");
-  const [timeSlot, setTimeSlot] = useState("");
-  const [bookingId, setBookingId] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [bookedSlots] = useState<string[]>([]);
-
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() + i);
     return d.toISOString().split("T")[0];
   });
+
+  const [step, setStep] = useState(1);
+  const [service, setService] = useState<Service | null>(null);
+  const [dateKey, setDateKey] = useState(days[0]);
+  const [timeSlot, setTimeSlot] = useState("");
+  const [bookingId, setBookingId] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [bookedSlots] = useState<string[]>([]);
 
   const slotsForDay = salon.availableSlots.filter((s) => s.startsWith(dateKey));
 

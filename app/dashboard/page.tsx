@@ -39,16 +39,19 @@ const heatmap = [
   { hour: "20", load: 30 },
 ];
 
+import { isClerkConfigured } from "@/lib/clerk-config";
+
 export default function DashboardPage() {
   const { user, isLoaded } = useUser();
-  const role = (user?.publicMetadata?.role as string) || "user";
+  const isDemo = !isClerkConfigured();
+  const role = (user?.publicMetadata?.role as string) || (isDemo ? "owner" : "user");
   const [tab, setTab] = useState("overview");
   const [prompt, setPrompt] = useState("");
   const [channel, setChannel] = useState("Instagram Caption");
   const [copies, setCopies] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
-  if (isLoaded && role !== "owner") {
+  if (isLoaded && role !== "owner" && !isDemo) {
     return (
       <div className="mx-auto max-w-lg px-4 py-20 text-center">
         <p className="text-cream-muted">
