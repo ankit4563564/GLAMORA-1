@@ -74,7 +74,7 @@ export function ChatInterface() {
       id: newId(),
       role: "assistant",
       content:
-        "Namaste! I'm Glamora's concierge for Bangalore's finest lounges. How can I curate your next appointment?",
+        "Namaste! I&apos;m Glamora&apos;s concierge for Bangalore&apos;s finest lounges. How can I curate your next appointment?",
     },
   ]);
   const [input, setInput] = useState("");

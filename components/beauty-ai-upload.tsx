@@ -341,7 +341,7 @@ export function BeautyAIUpload() {
                 </div>
               </div>
               <p className="mt-6 text-center text-xs text-cream-muted italic">
-                "AI visualization of recommended {analysis.faceShape.recommendedStyles[0]} with specialized {analysis.skinTone.treatments[0]}"
+                {'"'}AI visualization of recommended {analysis.faceShape.recommendedStyles[0]} with specialized {analysis.skinTone.treatments[0]}{'"'}
               </p>
             </div>
 
