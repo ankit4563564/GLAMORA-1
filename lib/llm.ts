@@ -4,8 +4,8 @@ import { geminiChat, isGeminiConfigured } from "@/lib/gemini";
 export type LlmBackend = "groq" | "gemini" | "none";
 
 export function getTextLlmBackend(): LlmBackend {
-  if (isGroqConfigured()) return "groq";
   if (isGeminiConfigured()) return "gemini";
+  if (isGroqConfigured()) return "groq";
   return "none";
 }
 
