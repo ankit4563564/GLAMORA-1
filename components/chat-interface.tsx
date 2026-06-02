@@ -77,13 +77,18 @@ export function ChatInterface() {
   ]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
   }, [messages, typing]);
 
   useEffect(() => {
@@ -200,7 +205,10 @@ export function ChatInterface() {
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
+          <div 
+            ref={scrollRef}
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4"
+          >
             <div className="space-y-4">
               {messages.map((m) => (
                 <div
@@ -278,7 +286,6 @@ export function ChatInterface() {
                 </div>
               ))}
               {typing && <TypingIndicator />}
-              <div ref={bottomRef} />
             </div>
           </div>
 
