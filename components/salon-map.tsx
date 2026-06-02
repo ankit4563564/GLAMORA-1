@@ -61,7 +61,7 @@ export default function SalonMap({ salons, center = [12.9716, 77.5946], zoom = 1
         center={center}
         zoom={zoom}
         scrollWheelZoom={true}
-        style={{ h: "100%", w: "100%", height: "100%", width: "100%" }}
+        style={{ height: "100%", width: "100%" }}
         className="h-full w-full"
       >
         <TileLayer
