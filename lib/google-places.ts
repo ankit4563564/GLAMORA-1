@@ -21,9 +21,13 @@ export async function searchGoogleSalons(query: string, location?: string): Prom
   }
 
   const searchTerm = location ? `${query} in ${location}` : query;
+  
+  // Use a broader search if the query is specific like "skin" or "spa"
+  const typeParam = query.toLowerCase().includes("skin") ? "" : "&type=beauty_salon";
+  
   const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(
     searchTerm
-  )}&type=beauty_salon&key=${GOOGLE_MAPS_API_KEY}`;
+  )}${typeParam}&key=${GOOGLE_MAPS_API_KEY}`;
 
   try {
     const res = await fetch(url);
