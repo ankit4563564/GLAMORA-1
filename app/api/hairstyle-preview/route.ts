@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getVisionModel } from "@/lib/gemini";
+import { groqVision, isGroqConfigured } from "@/lib/groq";
 import { HairstylePreviewResponse } from "@/lib/hairstyle-types";
 import { getUserId } from "@/lib/auth";
 import Replicate from "replicate";
@@ -38,21 +39,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Image required" }, { status: 400 });
     }
 
-    // Step 1: Analyze with Gemini Vision
-    const model = getVisionModel();
-    const base64 = image.replace(/^data:image\/\w+;base64,/, "");
-    
-    const result = await model.generateContent([
-      ANALYSIS_PROMPT,
-      {
-        inlineData: {
-          mimeType: "image/jpeg",
-          data: base64,
+    // Step 1: Analyze with AI Vision
+    let text = "";
+    if (isGroqConfigured()) {
+      text = await groqVision({ prompt: ANALYSIS_PROMPT, image });
+    } else {
+      const model = getVisionModel();
+      const base64 = image.replace(/^data:image\/\w+;base64,/, "");
+      const result = await model.generateContent([
+        ANALYSIS_PROMPT,
+        {
+          inlineData: {
+            mimeType: "image/jpeg",
+            data: base64,
+          },
         },
-      },
-    ]);
-
-    const text = result.response.text();
+      ]);
+      text = result.response.text();
+    }
+    
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error("Failed to parse analysis from AI");

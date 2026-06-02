@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserId } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { getVisionModel } from "@/lib/gemini";
+import { groqVision, isGroqConfigured } from "@/lib/groq";
 import { BEAUTY_AI_FALLBACK } from "@/lib/seed-data";
 import { getSalons } from "@/lib/salons";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
 
 const PROMPT = `You are a professional beauty consultant AI. Analyze this selfie and return ONLY valid JSON with this structure: 
 { 
@@ -24,12 +24,9 @@ export async function POST(req: NextRequest) {
 
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  const limit = rateLimit(ip, 30_000);
-  if (!limit.allowed) {
-    return NextResponse.json(
-      { error: `Rate limited. Retry in ${limit.retryAfter}s` },
-      { status: 429 }
-    );
+  const limit = await rateLimit(ip, 5, 60);
+  if (!limit.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
   const { image } = await req.json();
@@ -40,25 +37,30 @@ export async function POST(req: NextRequest) {
   let analysis = BEAUTY_AI_FALLBACK;
 
   try {
-    const model = getVisionModel();
-    const base64 = image.replace(/^data:image\/\w+;base64,/, "");
-    const result = await model.generateContent([
-      PROMPT,
-      {
-        inlineData: {
-          mimeType: "image/jpeg",
-          data: base64,
+    let text = "";
+    if (isGroqConfigured()) {
+      text = await groqVision({ prompt: PROMPT, image });
+    } else {
+      const model = getVisionModel();
+      const base64 = image.replace(/^data:image\/\w+;base64,/, "");
+
+      const result = await model.generateContent([
+        PROMPT,
+        {
+          inlineData: {
+            mimeType: "image/jpeg",
+            data: base64,
+          },
         },
-      },
-    ]);
-    const text = result.response.text();
+      ]);
+      text = result.response.text();
+    }
+
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      try {
-        analysis = JSON.parse(jsonMatch[0]);
-      } catch (e) {
-        console.warn("Beauty AI invalid JSON response:", text);
-      }
+      analysis = JSON.parse(jsonMatch[0]);
+    } else {
+      console.warn("Beauty AI invalid JSON response:", text);
     }
   } catch (err) {
     console.error("Beauty AI failed:", err);
