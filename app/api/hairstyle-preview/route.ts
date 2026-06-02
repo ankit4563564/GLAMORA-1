@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getVisionModel } from "@/lib/gemini";
 import { HairstylePreviewResponse } from "@/lib/hairstyle-types";
+import { getUserId } from "@/lib/auth";
+import Replicate from "replicate";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60; // Long timeout for image generation
+export const maxDuration = 120; // Replicate can take 15-45s
+
+const replicate = new Replicate({
+  auth: process.env.REPLICATE_API_TOKEN,
+});
 
 const ANALYSIS_PROMPT = `Analyze this person's selfie for a professional beauty makeover. 
 Return ONLY valid JSON with this structure:
@@ -18,6 +24,15 @@ Focus on hairstyle recommendations that complement their facial architecture.`;
 
 export async function POST(req: NextRequest) {
   try {
+    const userId = await getUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!process.env.REPLICATE_API_TOKEN) {
+      return NextResponse.json({ error: "Replicate API Token not configured" }, { status: 500 });
+    }
+
     const { image } = await req.json();
     if (!image) {
       return NextResponse.json({ error: "Image required" }, { status: 400 });
@@ -44,12 +59,29 @@ export async function POST(req: NextRequest) {
     }
     const analysis = JSON.parse(jsonMatch[0]);
 
-    // Step 2: Generate Edited Image
-    // In a real production app, you would call Stability AI, Replicate, or a similar service.
-    // For this implementation, we will simulate the process and provide a high-quality preview.
-    // We'll use a placeholder logic that would be replaced by a real API call.
-    
-    const generatedImageUrl = await simulateHairstyleGeneration(image, analysis.recommendedHairstyle);
+    // Step 2: Generate Edited Image using Replicate + Flux Kontext
+    // Using a reliable Flux-based image-to-image or inpainting model
+    const output = await replicate.run(
+      "lucataco/flux-dev-multi-controlnet:85d68d7a12b972e6b206f477e31b6976722d36489375d038234149864d42065b",
+      {
+        input: {
+          prompt: `A high-quality, photorealistic beauty industry portrait of the same person with a ${analysis.recommendedHairstyle}. Preserve the exact facial features, identity, expression, clothing, and background. Only modify the hair to match the requested style. Studio lighting, professional salon makeover finish.`,
+          image: image,
+          control_image: image,
+          controlnet_type: "depth", // Depth helps preserve the head shape and background
+          controlnet_conditioning_scale: 0.5,
+          num_inference_steps: 30,
+          guidance_scale: 3.5,
+        }
+      }
+    );
+
+    // Replicate returns an array or a single string depending on the model
+    const generatedImageUrl = Array.isArray(output) ? output[0] : (typeof output === "string" ? output : null);
+
+    if (!generatedImageUrl) {
+      throw new Error("Replicate failed to return an image");
+    }
 
     const response: HairstylePreviewResponse = {
       analysis: {
@@ -67,37 +99,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-async function simulateHairstyleGeneration(originalImage: string, style: string): Promise<string> {
-  // This is where you'd call Stability AI's Image-to-Image API.
-  // Example call (commented out as it requires an API key):
-  /*
-  const response = await fetch("https://api.stability.ai/v1/generation/stable-diffusion-v1-6/image-to-image", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.STABILITY_API_KEY}`,
-    },
-    body: JSON.stringify({
-      text_prompts: [
-        {
-          text: `Transform this person's hairstyle into a ${style}. Preserve identity, facial structure, skin tone, clothing, lighting and background. Only modify the hairstyle. Photorealistic salon makeover. High quality beauty industry preview.`,
-          weight: 1,
-        },
-      ],
-      init_image: originalImage,
-      image_strength: 0.35,
-    }),
-  });
-  */
-
-  // For the purpose of this demonstration/prototype, we'll return the original image 
-  // but in a production environment, this would be the URL or base64 of the generated image.
-  // We'll simulate a delay to mimic the generation process.
-  await new Promise((resolve) => setTimeout(resolve, 3000));
-  
-  // Returning the original image for now as a fallback. 
-  // To truly see the effect, a real image generation API is needed.
-  return originalImage; 
 }

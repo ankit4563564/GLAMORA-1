@@ -17,6 +17,7 @@ const isPublic = createRouteMatcher([
   "/api/salons(.*)",
   "/api/agent(.*)",
   "/api/beauty-ai(.*)",
+  "/api/hairstyle-preview(.*)",
 ]);
 
 const isOwnerRoute = createRouteMatcher(["/dashboard(.*)"]);
