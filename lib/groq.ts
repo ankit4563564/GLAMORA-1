@@ -18,7 +18,7 @@ export function getGroqModel(): string {
 }
 
 export function getGroqVisionModel(): string {
-  return process.env.GROQ_VISION_MODEL?.trim() || "llama-3.2-11b-vision-preview";
+  return process.env.GROQ_VISION_MODEL?.trim() || "meta-llama/Llama-4-Scout-17B-16E-Instruct";
 }
 
 /** Fast chat completion via Groq (OpenAI-compatible API). */
