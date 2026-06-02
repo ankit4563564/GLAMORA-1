@@ -29,6 +29,7 @@ function toSalonCard(s: SalonDoc) {
     priceRange: s.priceRange,
     specialty: s.specialty,
     images: resolveSalonImages(s.images),
+    coordinates: s.coordinates,
   };
 }
 

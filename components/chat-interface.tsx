@@ -10,12 +10,20 @@ import { Input } from "./ui/input";
 import { AIGlowPanel } from "./ai-glow-panel";
 import { Star } from "lucide-react";
 
+import dynamic from "next/dynamic";
+
+const SalonMap = dynamic(() => import("@/components/salon-map"), { 
+  ssr: false,
+  loading: () => <div className="h-64 w-full bg-[#1A1C29]/50 rounded-xl animate-pulse" />
+});
+
 type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
   salons?: SalonPayload[];
   booking?: BookingPayload;
+  viewMode?: "list" | "map";
 };
 
 type SalonPayload = {
@@ -26,6 +34,7 @@ type SalonPayload = {
   priceRange: string;
   specialty: string;
   images: string[];
+  coordinates?: { lat: number; lng: number };
 };
 
 type BookingPayload = {
@@ -233,41 +242,89 @@ export function ChatInterface() {
                       <p className="whitespace-pre-wrap text-sm">{m.content}</p>
                     )}
 
-                    {m.salons?.map((salon) => (
-                      <motion.div
-                        key={salon._id}
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="overflow-hidden rounded-xl border border-white/10 bg-[#1A1C29]/80 shadow-glass"
-                      >
-                        <div className="relative h-32 w-full">
-                          <SalonImage
-                            src={salon.images?.[0] || DEFAULT_SALON_IMAGE}
-                            alt={salon.name}
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
-                        <div className="p-3">
-                          <p className="font-display text-cream">{salon.name}</p>
-                          <p className="text-xs text-cream-muted">
-                            {salon.area} · {salon.specialty}
+                    {m.salons && m.salons.length > 0 && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-violet-300">
+                            Spatial Intelligence · {m.salons.length} results
                           </p>
-                          <div className="mt-2 flex items-center justify-between">
-                            <span className="flex items-center gap-1 text-sm text-amber-400">
-                              <Star className="h-3 w-3 fill-amber-400" />
-                              {salon.rating}
-                            </span>
-                            <span className="font-mono text-xs text-cream-muted">
-                              {salon.priceRange}
-                            </span>
+                          <div className="flex rounded-lg bg-black/40 p-0.5 border border-white/5">
+                            <button
+                              onClick={() => {
+                                setMessages(prev => prev.map(msg => msg.id === m.id ? { ...msg, viewMode: "list" } : msg))
+                              }}
+                              className={`rounded-md px-2 py-1 text-[10px] font-bold transition-all ${
+                                (m.viewMode || "list") === "list" ? "bg-violet-600 text-white" : "text-cream-muted"
+                              }`}
+                            >
+                              List
+                            </button>
+                            <button
+                              onClick={() => {
+                                setMessages(prev => prev.map(msg => msg.id === m.id ? { ...msg, viewMode: "map" } : msg))
+                              }}
+                              className={`rounded-md px-2 py-1 text-[10px] font-bold transition-all ${
+                                m.viewMode === "map" ? "bg-violet-600 text-white" : "text-cream-muted"
+                              }`}
+                            >
+                              Map
+                            </button>
                           </div>
-                          <Button size="sm" className="mt-3 w-full" asChild>
-                            <Link href={`/book/${salon._id}`}>Book</Link>
-                          </Button>
                         </div>
-                      </motion.div>
-                    ))}
+
+                        {(m.viewMode || "list") === "list" ? (
+                          <div className="grid gap-3">
+                            {m.salons.map((salon) => (
+                              <motion.div
+                                key={salon._id}
+                                initial={{ opacity: 0, y: 8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="overflow-hidden rounded-xl border border-white/10 bg-[#1A1C29]/80 shadow-glass"
+                              >
+                                <div className="relative h-32 w-full">
+                                  <SalonImage
+                                    src={salon.images?.[0] || DEFAULT_SALON_IMAGE}
+                                    alt={salon.name}
+                                    fill
+                                    className="object-cover"
+                                  />
+                                </div>
+                                <div className="p-3">
+                                  <p className="font-display text-cream">{salon.name}</p>
+                                  <p className="text-xs text-cream-muted">
+                                    {salon.area} · {salon.specialty}
+                                  </p>
+                                  <div className="mt-2 flex items-center justify-between">
+                                    <span className="flex items-center gap-1 text-sm text-amber-400">
+                                      <Star className="h-3 w-3 fill-amber-400" />
+                                      {salon.rating}
+                                    </span>
+                                    <span className="font-mono text-xs text-cream-muted">
+                                      {salon.priceRange}
+                                    </span>
+                                  </div>
+                                  <Button size="sm" className="mt-3 w-full" asChild>
+                                    <Link href={`/book/${salon._id}`}>Book</Link>
+                                  </Button>
+                                </div>
+                              </motion.div>
+                            ))}
+                          </div>
+                        ) : (
+                          <motion.div 
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="h-80 w-full overflow-hidden rounded-xl border border-white/10 shadow-ai-glow-sm"
+                          >
+                            <SalonMap 
+                              salons={m.salons as any} 
+                              center={m.salons[0]?.coordinates ? [m.salons[0].coordinates.lat, m.salons[0].coordinates.lng] : [12.9716, 77.5946]}
+                              zoom={13}
+                            />
+                          </motion.div>
+                        )}
+                      </div>
+                    )}
 
                     {m.booking && (
                       <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
