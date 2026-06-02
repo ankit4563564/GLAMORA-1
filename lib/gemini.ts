@@ -13,15 +13,20 @@ export function getGeminiClient(): GoogleGenerativeAI {
   return client;
 }
 
+function getModelName(envVar: string | undefined, fallback: string): string {
+  if (!envVar) return fallback;
+  // Strip quotes and lowercase for safety
+  return envVar.trim().replace(/^["']|["']$/g, "").toLowerCase();
+}
+
 export function getVisionModel() {
   return getGeminiClient().getGenerativeModel({
-    model: process.env.GEMINI_VISION_MODEL?.trim() || "gemini-1.5-flash",
+    model: getModelName(process.env.GEMINI_VISION_MODEL, "gemini-2.0-flash"),
   });
 }
 
 export function getAgentModel() {
-  const modelName =
-    process.env.GEMINI_AGENT_MODEL?.trim() || "gemini-1.5-flash";
+  const modelName = getModelName(process.env.GEMINI_AGENT_MODEL, "gemini-2.0-flash");
   return getGeminiClient().getGenerativeModel({
     model: modelName,
     generationConfig: { maxOutputTokens: 256, temperature: 0.2 },
@@ -30,7 +35,7 @@ export function getAgentModel() {
 
 export function getMarketingModel() {
   return getGeminiClient().getGenerativeModel({
-    model: process.env.GEMINI_MARKETING_MODEL?.trim() || "gemini-1.5-flash",
+    model: getModelName(process.env.GEMINI_MARKETING_MODEL, "gemini-2.0-flash"),
   });
 }
 
@@ -42,7 +47,7 @@ export async function geminiChat(params: {
   temperature?: number;
 }): Promise<string> {
   const model = getGeminiClient().getGenerativeModel({
-    model: process.env.GEMINI_AGENT_MODEL?.trim() || "gemini-1.5-flash",
+    model: getModelName(process.env.GEMINI_AGENT_MODEL, "gemini-2.0-flash"),
     generationConfig: {
       maxOutputTokens: params.maxTokens ?? 512,
       temperature: params.temperature ?? 0.3,
