@@ -39,6 +39,10 @@ const SalonSchema = new Schema(
     sentimentSummary: SentimentSchema,
     ownerName: String,
     ownerEmail: String,
+    coordinates: {
+      lat: { type: Number },
+      lng: { type: Number }
+    }
   },
   { timestamps: true }
 );

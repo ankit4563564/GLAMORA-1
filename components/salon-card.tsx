@@ -17,6 +17,7 @@ export interface SalonCardData {
   priceRange: string;
   specialty: string;
   images: string[];
+  coordinates?: { lat: number; lng: number };
 }
 
 export function SalonCard({

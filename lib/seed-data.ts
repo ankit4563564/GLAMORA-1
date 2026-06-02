@@ -410,6 +410,7 @@ export const SEED_SALONS = [
     },
     ownerName: "James Thomas",
     ownerEmail: "james@serenitysalon.in",
+    coordinates: { lat: 12.8452, lng: 77.6632 },
   },
 ];
 

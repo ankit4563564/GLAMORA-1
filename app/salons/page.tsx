@@ -2,11 +2,19 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { motion } from "framer-motion";
+import dynamic from "next/dynamic";
 import { PageTransition } from "@/components/page-transition";
 import { SalonFilters, type FilterState } from "@/components/salon-filters";
 import { SalonCard, type SalonCardData } from "@/components/salon-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { staggerContainer } from "@/lib/motion";
+import { LayoutGrid, Map as MapIcon } from "lucide-react";
+
+// Dynamically import map to prevent SSR issues
+const SalonMap = dynamic(() => import("@/components/salon-map"), { 
+  ssr: false,
+  loading: () => <div className="h-[500px] w-full bg-[#1A1C29]/50 rounded-2xl animate-pulse" />
+});
 
 const defaultFilters: FilterState = {
   search: "",
@@ -17,12 +25,14 @@ const defaultFilters: FilterState = {
 };
 
 type SortKey = "relevance" | "rating" | "price" | "distance";
+type ViewMode = "grid" | "map";
 
 export default function SalonsPage() {
   const [salons, setSalons] = useState<SalonCardData[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [sort, setSort] = useState<SortKey>("relevance");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
   useEffect(() => {
     fetch("/api/salons")
@@ -68,10 +78,39 @@ export default function SalonsPage() {
   return (
     <PageTransition>
       <div className="mx-auto max-w-7xl px-4 py-10">
-        <h1 className="font-display text-4xl text-metallic">Marketplace</h1>
-        <p className="mt-2 text-cream-muted">
-          Premium grooming lounges across Bangalore
-        </p>
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div>
+            <h1 className="font-display text-4xl text-metallic">Marketplace</h1>
+            <p className="mt-2 text-cream-muted">
+              Premium grooming lounges across Bangalore
+            </p>
+          </div>
+
+          <div className="flex bg-[#1A1C29]/80 rounded-lg p-1 border border-white/5 self-start">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                viewMode === "grid" 
+                ? "bg-violet-600 text-white shadow-lg" 
+                : "text-cream-muted hover:text-cream"
+              }`}
+            >
+              <LayoutGrid size={14} />
+              Grid
+            </button>
+            <button
+              onClick={() => setViewMode("map")}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                viewMode === "map" 
+                ? "bg-violet-600 text-white shadow-lg" 
+                : "text-cream-muted hover:text-cream"
+              }`}
+            >
+              <MapIcon size={14} />
+              Map
+            </button>
+          </div>
+        </div>
 
         <div className="mt-4 flex gap-2 text-sm">
           {(["relevance", "rating", "price", "distance"] as SortKey[]).map((s) => (
@@ -96,18 +135,34 @@ export default function SalonsPage() {
             onChange={setFilters}
             onClear={() => setFilters(defaultFilters)}
           />
-          <motion.div
-            className="grid flex-1 grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
-            variants={staggerContainer}
-            initial="hidden"
-            animate={loading ? "hidden" : "show"}
-          >
-            {loading
-              ? Array.from({ length: 6 }).map((_, i) => (
-                  <Skeleton key={i} className="aspect-[3/4] w-full rounded-2xl" />
-                ))
-              : filtered.map((s, i) => <SalonCard key={s._id} salon={s} index={i} />)}
-          </motion.div>
+
+          <div className="flex-1">
+            {viewMode === "grid" ? (
+              <motion.div
+                className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
+                variants={staggerContainer}
+                initial="hidden"
+                animate={loading ? "hidden" : "show"}
+              >
+                {loading
+                  ? Array.from({ length: 6 }).map((_, i) => (
+                      <Skeleton key={i} className="aspect-[3/4] w-full rounded-2xl" />
+                    ))
+                  : filtered.map((s, i) => <SalonCard key={s._id} salon={s} index={i} />)}
+              </motion.div>
+            ) : (
+              <div className="h-[min(650px,calc(100vh-250px))] min-h-[400px] w-full sticky top-24">
+                {loading ? (
+                   <Skeleton className="h-full w-full rounded-2xl" />
+                ) : (
+                  <SalonMap 
+                    salons={filtered as any} 
+                    center={filtered.length > 0 && (filtered[0] as any).coordinates ? [(filtered[0] as any).coordinates.lat, (filtered[0] as any).coordinates.lng] : undefined}
+                  />
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </PageTransition>

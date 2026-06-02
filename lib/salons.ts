@@ -4,17 +4,21 @@ import { ensureSalonsSeeded, seedFallbackSalons } from "./ensure-seed";
 import { SEED_SALONS } from "./seed-data";
 import { resolveSalonImages } from "./salon-images";
 
-export type SalonDoc = (typeof SEED_SALONS)[0] & { _id: string };
+export type SalonDoc = (typeof SEED_SALONS)[0] & { 
+  _id: string;
+  coordinates?: { lat: number; lng: number };
+};
 
 function mapSalons(
   salons: Array<Record<string, unknown> & { _id: unknown }>
 ): SalonDoc[] {
   return salons.map((s) => {
-    const row = s as Record<string, unknown> & { images?: string[] };
+    const row = s as Record<string, unknown> & { images?: string[]; coordinates?: any };
     return {
       ...row,
       _id: String(s._id),
       images: resolveSalonImages(row.images),
+      coordinates: row.coordinates
     };
   }) as unknown as SalonDoc[];
 }
@@ -56,7 +60,7 @@ export async function getSalons(filters?: {
 
     let salons = await Salon.find(query)
       .select(
-        "name area city rating reviewCount specialty description services images openHours availableSlots priceRange tags sentimentSummary ownerName ownerEmail"
+        "name area city rating reviewCount specialty description services images openHours availableSlots priceRange tags sentimentSummary ownerName ownerEmail coordinates"
       )
       .lean();
 
