@@ -8,7 +8,13 @@ import { getSalons } from "@/lib/salons";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-const PROMPT = `You are a professional beauty consultant AI. Analyze this selfie and return ONLY valid JSON with this structure: { "faceShape": { "shape": string, "confidence": number, "description": string, "recommendedStyles": string[] }, "skinTone": { "undertone": string, "complexion": string, "treatments": string[] }, "hairTexture": { "type": string, "condition": string, "treatments": string[] } }`;
+const PROMPT = `You are a professional beauty consultant AI. Analyze this selfie and return ONLY valid JSON with this structure: 
+{ 
+  "faceShape": { "shape": string, "confidence": number, "description": string, "recommendedStyles": string[] }, 
+  "skinTone": { "undertone": string, "confidence": number, "complexion": string, "treatments": string[] }, 
+  "hairTexture": { "type": string, "confidence": number, "condition": string, "treatments": string[] },
+  "beautyProfileScore": number 
+}`;
 
 export async function POST(req: NextRequest) {
   const userId = await getUserId();

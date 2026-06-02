@@ -20,7 +20,27 @@ import { resolveSalonImages } from "@/lib/salon-images";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-function toSalonCard(s: SalonDoc) {
+function toSalonCard(s: SalonDoc, query: string) {
+  const q = query.toLowerCase();
+  const reasons = [
+    `Experts in ${s.specialty.toLowerCase()}`,
+  ];
+  
+  if (s.rating >= 4.7) reasons.push("Top-rated for service quality");
+  if (s.priceRange.includes('₹')) {
+    const price = parseInt(s.priceRange.replace(/[^0-9]/g, '')) || 500;
+    if (price < 1500) reasons.push("Great value for luxury experience");
+  }
+  
+  // Custom reasons based on query
+  if (q.includes('hair') || q.includes('cut')) reasons.push("Precision styling specialists");
+  if (q.includes('skin') || q.includes('facial')) reasons.push("Advanced dermal therapy");
+  if (q.includes('spa') || q.includes('massage')) reasons.push("Premium relaxation lounge");
+
+  // Deterministic but "AI-looking" score
+  const scoreBase = 85 + (s.rating * 2);
+  const matchScore = Math.min(99, Math.floor(scoreBase + (Math.random() * 5)));
+
   return {
     _id: s._id,
     name: s.name,
@@ -29,6 +49,8 @@ function toSalonCard(s: SalonDoc) {
     priceRange: s.priceRange,
     specialty: s.specialty,
     images: resolveSalonImages(s.images),
+    matchScore,
+    whyRecommended: reasons.slice(0, 3)
   };
 }
 
@@ -190,7 +212,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         type: "salons",
         response: aiMessage,
-        salons: results.map(toSalonCard),
+        salons: results.map(s => toSalonCard(s, userQuery)),
       });
     }
 

@@ -50,7 +50,9 @@ const config: Config = {
       },
       boxShadow: {
         "gold-glow": "0 0 32px rgba(245, 158, 11, 0.25)",
+        "gold-glow-sm": "0 0 15px rgba(245, 158, 11, 0.2)",
         glass: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+        "glass-lg": "0 35px 60px -15px rgba(0, 0, 0, 0.6)",
         "ai-glow": "0 0 24px rgba(124, 58, 237, 0.35), 0 0 48px rgba(34, 211, 238, 0.12)",
         "ai-glow-sm": "0 0 15px rgba(124, 58, 237, 0.3)",
       },
@@ -58,6 +60,7 @@ const config: Config = {
         "pulse-gold": "pulse-gold 2s ease-in-out infinite",
         shimmer: "shimmer 2s linear infinite",
         "slot-pulse": "slot-pulse 2s ease-in-out infinite",
+        "spin-slow": "spin 3s linear infinite",
       },
       keyframes: {
         "pulse-gold": {
