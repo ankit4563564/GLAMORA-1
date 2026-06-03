@@ -3,14 +3,13 @@ import { getVisionModel } from "@/lib/gemini";
 import { groqVision, isGroqConfigured } from "@/lib/groq";
 import { HairstylePreviewResponse } from "@/lib/hairstyle-types";
 import { getUserId } from "@/lib/auth";
-import Replicate from "replicate";
+import { HfInference } from "@huggingface/inference";
+import { uploadBase64Image } from "@/lib/cloudinary";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120; // Replicate can take 15-45s
+export const maxDuration = 120;
 
-const replicate = new Replicate({
-  auth: process.env.REPLICATE_API_TOKEN,
-});
+const hf = new HfInference(process.env.HUGGINGFACE_API_TOKEN);
 
 const ANALYSIS_PROMPT = `Analyze this person's selfie for a professional beauty makeover. 
 Return ONLY valid JSON with this structure:
@@ -30,8 +29,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!process.env.REPLICATE_API_TOKEN) {
-      return NextResponse.json({ error: "Replicate API Token not configured" }, { status: 500 });
+    if (!process.env.HUGGINGFACE_API_TOKEN) {
+      return NextResponse.json({ error: "Hugging Face API Token not configured" }, { status: 500 });
     }
 
     const { image } = await req.json();
@@ -39,7 +38,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Image required" }, { status: 400 });
     }
 
-    // Step 1: Analyze with AI Vision
+    // Step 1: Analyze with AI Vision (Gemini or Groq)
     let text = "";
     if (isGroqConfigured()) {
       text = await groqVision({ prompt: ANALYSIS_PROMPT, image });
@@ -64,27 +63,24 @@ export async function POST(req: NextRequest) {
     }
     const analysis = JSON.parse(jsonMatch[0]);
 
-    // Step 2: Generate Edited Image using Replicate + Flux Dev (Img2Img)
-    const output = await replicate.run(
-      "black-forest-labs/flux-dev",
-      {
-        input: {
-          prompt: `A high-quality, photorealistic beauty industry portrait of the same person with a ${analysis.recommendedHairstyle}. Preserve the exact facial features, identity, expression, clothing, and background. Only modify the hair to match the requested style. Studio lighting, professional salon makeover finish.`,
-          image: image,
-          prompt_strength: 0.7, // High enough to change hair, low enough to keep face
-          num_inference_steps: 28,
-          guidance_scale: 3.5,
-          output_format: "webp",
-        }
-      }
-    );
+    // Step 2: Generate Edited Image using Hugging Face (Img2Img)
+    const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Data, "base64");
+    const blob = new Blob([buffer], { type: "image/jpeg" });
 
-    // Replicate returns an array or a single string depending on the model
-    const generatedImageUrl = Array.isArray(output) ? output[0] : (typeof output === "string" ? output : null);
+    const resultBlob = await hf.imageToImage({
+      model: "stabilityai/stable-diffusion-xl-base-1.0",
+      inputs: blob,
+      parameters: {
+        prompt: `A high-quality, photorealistic beauty industry portrait of the same person with a ${analysis.recommendedHairstyle}. Preserve the exact facial features, identity, expression, clothing, and background. Only modify the hair to match the requested style. Studio lighting, professional salon makeover finish.`,
+        negative_prompt: "deformed, distorted, disfigured, poorly drawn face, bad anatomy, wrong identity, cartoon, anime, illustration, painting",
+        strength: 0.5,
+      },
+    });
 
-    if (!generatedImageUrl) {
-      throw new Error("Replicate failed to return an image");
-    }
+    const arrayBuffer = await resultBlob.arrayBuffer();
+    const resultBase64 = Buffer.from(arrayBuffer).toString("base64");
+    const generatedImageUrl = await uploadBase64Image(resultBase64, "glamora/hairstyle-previews");
 
     const response: HairstylePreviewResponse = {
       analysis: {
