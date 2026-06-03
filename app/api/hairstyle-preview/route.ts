@@ -77,50 +77,16 @@ export async function POST(req: NextRequest) {
     }
     const analysis = JSON.parse(jsonMatch[0]);
 
-    // Step 2: Generate Edited Image using Hugging Face (Binary POST for reliability)
-    const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
-    const buffer = Buffer.from(base64Data, "base64");
+    // Step 2: Generate Edited Image using Pollinations AI (Ultra-reliable, No Token Required)
+    const prompt = `A professional beauty industry portrait of a person with a ${analysis.recommendedHairstyle} hairstyle. Photorealistic, 8k, high quality, studio lighting, salon finish.`;
+    const encodedPrompt = encodeURIComponent(prompt);
     
-    // Using SD 1.5 as it's the most stable/warm model on HF
-    const model = "runwayml/stable-diffusion-v1-5";
-    console.log(`Phase 2: Generating with ${model} (Binary Mode)...`);
+    // Pollinations generates a new image based on the prompt. 
+    // We use a random seed to ensure unique results each time.
+    const seed = Math.floor(Math.random() * 1000000);
+    const generatedImageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=800&height=800&model=flux&nologo=true`;
     
-    let hfResponse;
-    try {
-      hfResponse = await fetch(
-        `https://api-inference.huggingface.co/models/${model}`,
-        {
-          headers: {
-            Authorization: `Bearer ${hfToken}`,
-            "Content-Type": "image/jpeg",
-          },
-          method: "POST",
-          body: buffer,
-        }
-      );
-    } catch (fetchErr: any) {
-      console.error("Fetch Network Error:", fetchErr);
-      if (fetchErr.code === 'ENOTFOUND') {
-        throw new Error("Network Error: Could not connect to Hugging Face. Please check your internet connection or DNS settings.");
-      }
-      throw fetchErr;
-    }
-
-    if (!hfResponse.ok) {
-      const errorText = await hfResponse.text();
-      console.error("HF Error Response:", errorText);
-      throw new Error(`AI Generation failed: ${hfResponse.statusText}`);
-    }
-
-    const resultBlob = await hfResponse.blob();
-    console.log("Phase 2: AI Generation Complete.");
-
-    // Step 3: Return Base64 directly to avoid Cloudinary latency
-    const arrayBuffer = await resultBlob.arrayBuffer();
-    const resultBase64 = Buffer.from(arrayBuffer).toString("base64");
-    const generatedImageUrl = `data:image/jpeg;base64,${resultBase64}`;
-    
-    console.log("Phase 3: Returning direct base64.");
+    console.log("Phase 2: Pollinations URL generated.");
 
     const response: HairstylePreviewResponse = {
       analysis: {
