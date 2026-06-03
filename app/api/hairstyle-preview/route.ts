@@ -62,42 +62,78 @@ export async function POST(req: NextRequest) {
     }
     const analysis = JSON.parse(jsonMatch[0]);
 
-    // Step 2: Generate Edited Image using Pollinations AI (Fast Default Model)
-    const prompt = `professional hairstyle, ${analysis.recommendedHairstyle}, high quality, realistic`;
+    // Step 2: Generate Edited Image using Dual Provider Strategy
+    const prompt = `professional hairstyle makeover, ${analysis.recommendedHairstyle}, photorealistic, high quality`;
     const encodedPrompt = encodeURIComponent(prompt);
-    
     const seed = Math.floor(Math.random() * 1000000);
+    
+    // We try multiple ways to get the image to handle rate limits and blocks
     const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=512&height=768&nologo=true`;
     
-    console.log("Phase 2: Generating AI Image via Cloudinary Proxy...");
+    console.log("Phase 2: Generating AI Image...");
     
     let generatedImageUrl = "";
+    
+    // Attempt 1: Pollinations via Cloudinary Proxy
     try {
-      // We use Cloudinary to fetch the image from Pollinations.
-      // This bypasses any local network blocks because Cloudinary's servers do the fetching.
-      const { uploadBase64Image, configureCloudinary } = await import("@/lib/cloudinary");
+      console.log("Attempting Pollinations + Cloudinary...");
+      const { configureCloudinary } = await import("@/lib/cloudinary");
       const cloudinary = configureCloudinary();
       
+      // We first check if Pollinations is returning the 402/Queue error
+      const pollCheck = await fetch(pollinationsUrl);
+      if (pollCheck.status === 402 || pollCheck.status === 429) {
+          throw new Error("Pollinations rate limit");
+      }
+
       const uploadRes = await cloudinary.uploader.upload(pollinationsUrl, {
         folder: "glamora/hairstyle-previews",
-        transformation: [{ width: 800, crop: "limit" }]
       });
       
       generatedImageUrl = uploadRes.secure_url;
-      console.log("Phase 2: Cloudinary Proxy Successful.");
-    } catch (err) {
-      console.error("Cloudinary Proxy Failed, falling back to server-side fetch:", err);
+      console.log("Success with Pollinations.");
+    } catch (pollinationsErr: any) {
+      console.warn("Pollinations failed or rate-limited, trying Fallback Provider (Hugging Face)...");
       
-      // Fallback: Try to fetch it directly on the server if Cloudinary fails
+      // Attempt 2: Hugging Face SDXL with direct fetch (Server-side)
       try {
-        const imgRes = await fetch(pollinationsUrl);
-        const arrayBuffer = await imgRes.arrayBuffer();
+        const hfToken = process.env.HUGGINGFACE_API_TOKEN?.trim();
+        if (!hfToken || hfToken === "hf_...") throw new Error("No HF Token");
+
+        const hfRes = await fetch(
+          "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
+          {
+            headers: { Authorization: `Bearer ${hfToken}`, "Content-Type": "application/json" },
+            method: "POST",
+            body: JSON.stringify({
+              inputs: image.replace(/^data:image\/\w+;base64,/, ""),
+              parameters: { prompt, strength: 0.5 },
+              options: { wait_for_model: true }
+            }),
+          }
+        );
+
+        if (!hfRes.ok) throw new Error("HF Provider failed");
+
+        const blob = await hfRes.ok ? await hfRes.blob() : null;
+        if (!blob) throw new Error("HF returned no data");
+
+        const arrayBuffer = await blob.arrayBuffer();
         const base64 = Buffer.from(arrayBuffer).toString("base64");
-        generatedImageUrl = `data:image/jpeg;base64,${base64}`;
-        console.log("Phase 2: Server-side fetch successful.");
-      } catch (fallbackErr) {
-        console.error("All fetch methods failed:", fallbackErr);
-        generatedImageUrl = pollinationsUrl; // Last resort
+        
+        // Host the HF result on Cloudinary for stability
+        const { configureCloudinary } = await import("@/lib/cloudinary");
+        const cloudinary = configureCloudinary();
+        const uploadRes = await cloudinary.uploader.upload(`data:image/jpeg;base64,${base64}`, {
+          folder: "glamora/hairstyle-previews",
+        });
+        
+        generatedImageUrl = uploadRes.secure_url;
+        console.log("Success with Hugging Face fallback.");
+      } catch (hfErr) {
+        console.error("All AI providers failed:", hfErr);
+        // Final fallback: just return the Pollinations URL and hope the client can see it
+        generatedImageUrl = pollinationsUrl;
       }
     }
 
