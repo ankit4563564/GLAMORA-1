@@ -75,51 +75,70 @@ export async function POST(req: NextRequest) {
     }
     const analysis = JSON.parse(jsonMatch[0]);
 
-    // Step 2: Generate Edited Image using Hugging Face (Multi-model Fallback)
+    // Step 2: Generate Edited Image using Hugging Face (Multi-model Fallback with Direct Fetch)
     const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
-    const buffer = Buffer.from(base64Data, "base64");
-    const blob = new Blob([buffer], { type: "image/jpeg" });
-
+    
     const models = [
       "stabilityai/stable-diffusion-xl-base-1.0",
       "stabilityai/sdxl-turbo",
       "runwayml/stable-diffusion-v1-5",
-      "prompthero/openjourney",
-      "stabilityai/stable-diffusion-2-1"
+      "prompthero/openjourney"
     ];
 
     let resultBlob: Blob | null = null;
-    let lastError = null;
+    let lastErrorMsg = "";
 
     for (const model of models) {
       try {
-        console.log(`Attempting generation with ${model}...`);
-        resultBlob = await hf.imageToImage({
-          model: model,
-          inputs: blob,
-          parameters: {
-            prompt: `A professional beauty portrait of the same person with a ${analysis.recommendedHairstyle} hairstyle. Photorealistic, 8k, high quality.`,
-            negative_prompt: "deformed, blurry, bad anatomy, disfigured",
-            strength: 0.5,
-          },
-          options: {
-            wait_for_model: true,
+        console.log(`Directly fetching from ${model}...`);
+        const hfResponse = await fetch(
+          `https://api-inference.huggingface.co/models/${model}`,
+          {
+            headers: {
+              Authorization: `Bearer ${hfToken}`,
+              "Content-Type": "application/json",
+              "x-use-cache": "false",
+            },
+            method: "POST",
+            body: JSON.stringify({
+              inputs: base64Data,
+              parameters: {
+                prompt: `A professional beauty industry portrait with a ${analysis.recommendedHairstyle} hairstyle. Photorealistic, 8k, highly detailed.`,
+                negative_prompt: "deformed, blurry, bad anatomy, disfigured",
+                strength: 0.5,
+              },
+              options: {
+                wait_for_model: true,
+              }
+            }),
           }
-        });
-        
-        if (resultBlob) {
+        );
+
+        if (hfResponse.ok) {
+          resultBlob = await hfResponse.blob();
           console.log(`Successfully generated with ${model}`);
           break;
+        } else {
+          const errorData = await hfResponse.json().catch(() => ({}));
+          const msg = errorData.error || hfResponse.statusText;
+          console.error(`Model ${model} failed: ${msg}`);
+          lastErrorMsg = msg;
+          
+          // If it's an auth error, no point in trying other models with the same token
+          if (hfResponse.status === 401 || msg.toLowerCase().includes("auth") || msg.toLowerCase().includes("invalid")) {
+             throw new Error("Your Hugging Face API token is invalid or unauthorized. Please check your .env file.");
+          }
         }
       } catch (err: any) {
-        console.error(`Error with ${model}:`, err.message);
-        lastError = err;
-        continue; // Try next model
+        console.error(`Fetch error with ${model}:`, err.message);
+        if (err.message.includes("token is invalid")) throw err;
+        lastErrorMsg = err.message;
+        continue;
       }
     }
 
     if (!resultBlob) {
-      throw new Error(lastError?.message || "All Hugging Face models failed to generate an image. This usually happens when the free Inference API is under high load. Please try again in a few minutes.");
+      throw new Error(lastErrorMsg || "All Hugging Face models failed. Please verify your API token and try again later.");
     }
 
     const arrayBuffer = await resultBlob.arrayBuffer();
