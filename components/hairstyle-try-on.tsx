@@ -10,9 +10,8 @@ import { HairstylePreviewResponse } from "@/lib/hairstyle-types";
 
 const LOADING_STEPS = [
   "Analyzing face geometry...",
-  "Detecting hair texture...",
-  "Generating hairstyle preview...",
-  "Rendering result...",
+  "Choosing perfect style...",
+  "Generating AI preview...",
 ];
 
 async function compressImage(base64: string): Promise<string> {

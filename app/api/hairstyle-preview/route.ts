@@ -82,9 +82,9 @@ export async function POST(req: NextRequest) {
     const encodedPrompt = encodeURIComponent(prompt);
     
     // Pollinations generates a new image based on the prompt. 
-    // We use a random seed to ensure unique results each time.
+    // Using default fast model for better reliability.
     const seed = Math.floor(Math.random() * 1000000);
-    const generatedImageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=800&height=800&model=flux&nologo=true`;
+    const generatedImageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=800&height=800&nologo=true`;
     
     console.log("Phase 2: Pollinations URL generated.");
 
