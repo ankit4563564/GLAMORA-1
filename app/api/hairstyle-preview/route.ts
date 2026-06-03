@@ -77,52 +77,41 @@ export async function POST(req: NextRequest) {
     }
     const analysis = JSON.parse(jsonMatch[0]);
 
-    // Step 2: Generate Edited Image using Hugging Face (Optimized for speed)
+    // Step 2: Generate Edited Image using Hugging Face (Binary POST for reliability)
     const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Data, "base64");
     
-    // We use sdxl-turbo as it is significantly faster (1-2s) than other models,
-    // which helps avoid the 10s serverless timeout limit.
-    const model = "stabilityai/sdxl-turbo";
-    console.log(`Phase 2: Starting AI Generation with ${model}...`);
+    // Using SD 1.5 as it's the most stable/warm model on HF
+    const model = "runwayml/stable-diffusion-v1-5";
+    console.log(`Phase 2: Generating with ${model} (Binary Mode)...`);
     
     const hfResponse = await fetch(
       `https://api-inference.huggingface.co/models/${model}`,
       {
         headers: {
           Authorization: `Bearer ${hfToken}`,
-          "Content-Type": "application/json",
+          "Content-Type": "image/jpeg",
         },
         method: "POST",
-        body: JSON.stringify({
-          inputs: base64Data,
-          parameters: {
-            prompt: `professional beauty industry portrait, ${analysis.recommendedHairstyle} hairstyle, photorealistic, 8k`,
-            negative_prompt: "deformed, blurry",
-            strength: 0.5,
-            num_inference_steps: 2,
-            guidance_scale: 0.0,
-          },
-          options: {
-            wait_for_model: true,
-          }
-        }),
+        body: buffer,
       }
     );
 
     if (!hfResponse.ok) {
-      const errorData = await hfResponse.json().catch(() => ({}));
-      throw new Error(errorData.error || `AI Generation failed: ${hfResponse.statusText}`);
+      const errorText = await hfResponse.text();
+      console.error("HF Error Response:", errorText);
+      throw new Error(`AI Generation failed: ${hfResponse.statusText}`);
     }
 
     const resultBlob = await hfResponse.blob();
     console.log("Phase 2: AI Generation Complete.");
 
-    // Step 3: Upload to Cloudinary
-    console.log("Phase 3: Uploading to Cloudinary...");
+    // Step 3: Return Base64 directly to avoid Cloudinary latency
     const arrayBuffer = await resultBlob.arrayBuffer();
     const resultBase64 = Buffer.from(arrayBuffer).toString("base64");
-    const generatedImageUrl = await uploadBase64Image(resultBase64, "glamora/hairstyle-previews");
-    console.log("Phase 3: Upload Complete.");
+    const generatedImageUrl = `data:image/jpeg;base64,${resultBase64}`;
+    
+    console.log("Phase 3: Returning direct base64.");
 
     const response: HairstylePreviewResponse = {
       analysis: {
