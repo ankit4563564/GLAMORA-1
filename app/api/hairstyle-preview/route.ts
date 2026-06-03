@@ -75,41 +75,51 @@ export async function POST(req: NextRequest) {
     }
     const analysis = JSON.parse(jsonMatch[0]);
 
-    // Step 2: Generate Edited Image using Hugging Face (Img2Img)
+    // Step 2: Generate Edited Image using Hugging Face (Multi-model Fallback)
     const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
     const blob = new Blob([buffer], { type: "image/jpeg" });
 
-    let resultBlob;
-    try {
-      console.log("Attempting generation with sdxl-turbo...");
-      resultBlob = await hf.imageToImage({
-        model: "stabilityai/sdxl-turbo",
-        inputs: blob,
-        parameters: {
-          prompt: `A professional beauty portrait of the same person with a ${analysis.recommendedHairstyle} hairstyle. Photorealistic, 8k.`,
-          negative_prompt: "deformed, blurry, bad anatomy, disfigured",
-          strength: 0.5,
-        },
-        options: {
-          wait_for_model: true,
+    const models = [
+      "stabilityai/stable-diffusion-xl-base-1.0",
+      "stabilityai/sdxl-turbo",
+      "runwayml/stable-diffusion-v1-5",
+      "prompthero/openjourney",
+      "stabilityai/stable-diffusion-2-1"
+    ];
+
+    let resultBlob: Blob | null = null;
+    let lastError = null;
+
+    for (const model of models) {
+      try {
+        console.log(`Attempting generation with ${model}...`);
+        resultBlob = await hf.imageToImage({
+          model: model,
+          inputs: blob,
+          parameters: {
+            prompt: `A professional beauty portrait of the same person with a ${analysis.recommendedHairstyle} hairstyle. Photorealistic, 8k, high quality.`,
+            negative_prompt: "deformed, blurry, bad anatomy, disfigured",
+            strength: 0.5,
+          },
+          options: {
+            wait_for_model: true,
+          }
+        });
+        
+        if (resultBlob) {
+          console.log(`Successfully generated with ${model}`);
+          break;
         }
-      });
-    } catch (hfErr: any) {
-      console.error("Hugging Face Generation Error:", hfErr);
-      // Final fallback to a very basic model
-      console.log("Attempting final fallback to SD 1.5...");
-      resultBlob = await hf.imageToImage({
-        model: "runwayml/stable-diffusion-v1-5",
-        inputs: blob,
-        parameters: {
-          prompt: `hairstyle makeover: ${analysis.recommendedHairstyle}`,
-          strength: 0.5,
-        },
-        options: {
-          wait_for_model: true,
-        }
-      });
+      } catch (err: any) {
+        console.error(`Error with ${model}:`, err.message);
+        lastError = err;
+        continue; // Try next model
+      }
+    }
+
+    if (!resultBlob) {
+      throw new Error(lastError?.message || "All Hugging Face models failed to generate an image. This usually happens when the free Inference API is under high load. Please try again in a few minutes.");
     }
 
     const arrayBuffer = await resultBlob.arrayBuffer();
