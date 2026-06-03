@@ -15,6 +15,37 @@ const LOADING_STEPS = [
   "Rendering result...",
 ];
 
+async function compressImage(base64: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      let width = img.width;
+      let height = img.height;
+      const maxSide = 800;
+      
+      if (width > height) {
+        if (width > maxSide) {
+          height *= maxSide / width;
+          width = maxSide;
+        }
+      } else {
+        if (height > maxSide) {
+          width *= maxSide / height;
+          height = maxSide;
+        }
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx?.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", 0.7));
+    };
+    img.src = base64;
+  });
+}
+
 export function HairstyleTryOn() {
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<HairstylePreviewResponse | null>(null);
@@ -26,9 +57,10 @@ export function HairstyleTryOn() {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = () => {
-        setOriginalImage(reader.result as string);
-        generatePreview(reader.result as string);
+      reader.onload = async () => {
+        const compressed = await compressImage(reader.result as string);
+        setOriginalImage(compressed);
+        generatePreview(compressed);
       };
       reader.readAsDataURL(file);
     }
