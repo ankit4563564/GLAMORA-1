@@ -19,6 +19,7 @@ export function BeforeAfterSlider({
 }: BeforeAfterSliderProps) {
   const [sliderPosition, setSliderPosition] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
+  const [error, setError] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleMove = (clientX: number) => {
@@ -52,23 +53,8 @@ export function BeforeAfterSlider({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      {/* After Image (Background) - The "New" Look */}
-      <div className="absolute inset-0 bg-violet-900/20">
-        <Image
-          src={afterImage}
-          alt="After"
-          fill
-          className={`object-cover ${afterClassName || ""}`}
-          unoptimized
-          priority
-        />
-      </div>
-
-      {/* Before Image (Clipped) - The "Current" Look */}
-      <div 
-        className="absolute inset-0 z-10 pointer-events-none"
-        style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}
-      >
+      {/* Before Image (Background) - The "Old" Look */}
+      <div className="absolute inset-0">
         <Image
           src={beforeImage}
           alt="Before"
@@ -78,6 +64,28 @@ export function BeforeAfterSlider({
           priority
         />
       </div>
+
+      {/* After Image (Clipped) - The "New" Look */}
+      <div 
+        className="absolute inset-0 z-10 pointer-events-none"
+        style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}
+      >
+        <Image
+          src={afterImage}
+          alt="After"
+          fill
+          className={`object-cover ${afterClassName || ""}`}
+          unoptimized
+          priority
+          onError={() => setError(true)}
+        />
+      </div>
+
+      {error && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 text-center">
+          <p className="text-sm text-rose-400">Failed to load AI preview. Please try generating again.</p>
+        </div>
+      )}
 
       {/* Slider Line & Handle */}
       <div 
