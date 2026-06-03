@@ -11,16 +11,16 @@ export const maxDuration = 120;
 
 const hf = new HfInference(process.env.HUGGINGFACE_API_TOKEN);
 
-const ANALYSIS_PROMPT = `Analyze this person's selfie for a professional beauty makeover. 
+const ANALYSIS_PROMPT = `Analyze this person's selfie focusing specifically on their hair. 
 Return ONLY valid JSON with this structure:
 {
-  "faceShape": "string",
-  "skinTone": "string",
   "hairType": "string",
+  "hairTexture": "string",
+  "hairCondition": "string",
   "recommendedHairstyle": "string",
   "confidence": number
 }
-Focus on hairstyle recommendations that complement their facial architecture.`;
+Focus exclusively on hairstyle recommendations and hair characteristics.`;
 
 export async function POST(req: NextRequest) {
   try {

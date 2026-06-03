@@ -20,18 +20,12 @@ type Analysis = {
     shape: string;
     confidence: number;
     description: string;
-    recommendedStyles: string[];
+    recommendedFacialFeatures: string[];
   };
   skinTone: {
     undertone: string;
     confidence: number;
     complexion: string;
-    treatments: string[];
-  };
-  hairTexture: {
-    type: string;
-    confidence: number;
-    condition: string;
     treatments: string[];
   };
   beautyProfileScore?: number;
@@ -173,7 +167,7 @@ export function BeautyAIUpload() {
         <div className="glass-card p-6 text-center border-violet-500/30 bg-violet-500/5">
           <h2 className="font-display text-xl text-cream">Privacy Consent</h2>
           <p className="mt-2 text-sm text-cream-muted">
-            BeautyAI uses facial analysis to recommend grooming styles. Your image is processed securely and is not stored permanently on our servers.
+            BeautyAI uses facial analysis to recommend skin and grooming profiles. Your image is processed securely and is not stored permanently.
           </p>
           <div className="mt-4 flex items-center justify-center gap-3">
             <input 
@@ -192,7 +186,7 @@ export function BeautyAIUpload() {
             disabled={!consent}
             onClick={() => setConsent(true)}
           >
-            Enter BeautyAI
+            Enter Facial Analysis
           </Button>
         </div>
       )}
@@ -286,10 +280,6 @@ export function BeautyAIUpload() {
                        <div className="h-4 w-4 rounded-full bg-success/20 flex items-center justify-center">✓</div>
                        Skin Tone Analyzed
                      </motion.div>
-                     <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }} className="flex items-center gap-2 text-xs font-bold text-success uppercase tracking-widest">
-                       <div className="h-4 w-4 rounded-full bg-success/20 flex items-center justify-center">✓</div>
-                       Hair Texture Identified
-                     </motion.div>
                   </div>
                 ) : null}
               </div>
@@ -339,20 +329,20 @@ export function BeautyAIUpload() {
                 </div>
               </div>
               <p className="mt-6 text-center text-xs text-cream-muted italic">
-                {'"'}AI visualization of recommended {analysis.faceShape.recommendedStyles[0]} with specialized {analysis.skinTone.treatments[0]}{'"'}
+                {'"'}AI visualization of facial architecture analysis and recommended skin profile enhancements{'"'}
               </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               {/* Beauty Profile Score Card */}
-              <ResultCard title="Overall Beauty Score" className="sm:col-span-2 border-violet-500/30 bg-violet-500/5">
+              <ResultCard title="Overall Facial Score" className="sm:col-span-2 border-violet-500/30 bg-violet-500/5">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <p className="font-display text-4xl text-metallic">
                       {analysis.beautyProfileScore || 92}<span className="text-xl text-violet-400">/100</span>
                     </p>
                     <p className="text-xs font-bold text-success uppercase tracking-widest">
-                      Excellent Match Confidence
+                      High Confidence Analysis
                     </p>
                   </div>
                   <div className="h-16 w-16 rounded-full border-4 border-violet-500/20 flex items-center justify-center relative">
@@ -377,7 +367,7 @@ export function BeautyAIUpload() {
                   {analysis.faceShape.description}
                 </p>
                 <ul className="mt-2 list-inside list-disc text-sm text-cream">
-                  {analysis.faceShape.recommendedStyles.map((s) => (
+                  {analysis.faceShape.recommendedFacialFeatures.map((s) => (
                     <li key={s}>{s}</li>
                   ))}
                 </ul>
@@ -403,29 +393,13 @@ export function BeautyAIUpload() {
                   ))}
                 </ul>
               </ResultCard>
-              <ResultCard title="Strand Analytics">
-                <div className="flex items-center justify-between">
-                  <p className="text-cream">
-                    {analysis.hairTexture.type} · {analysis.hairTexture.condition}
-                  </p>
-                  <div className="bg-amber-500/20 px-2 py-1 rounded border border-amber-500/30">
-                    <p className="font-mono text-[10px] font-bold text-amber-300">
-                      {((analysis.hairTexture.confidence || 0.84) * 100).toFixed(0)}% CONFIDENCE
-                    </p>
-                  </div>
-                </div>
-                <ul className="mt-2 text-sm text-cream">
-                  {analysis.hairTexture.treatments.map((t) => (
-                    <li key={t}>• {t}</li>
-                  ))}
-                </ul>
-              </ResultCard>
-              <ResultCard title="Curated Matches">
-                <div className="space-y-3 mt-1">
+              
+              <ResultCard title="Recommended Skincare Studios" className="sm:col-span-2">
+                <div className="grid gap-4 sm:grid-cols-2 mt-1">
                   {matched.map((s) => (
                     <div
                       key={s._id}
-                      className="flex items-center justify-between group"
+                      className="flex items-center justify-between group p-3 rounded-xl border border-white/5 bg-white/5"
                     >
                       <div className="space-y-0.5">
                         <span className="text-sm font-medium text-cream group-hover:text-gold transition-colors">{s.name}</span>

@@ -8,11 +8,10 @@ import { getSalons } from "@/lib/salons";
 
 export const dynamic = "force-dynamic";
 
-const PROMPT = `You are a professional beauty consultant AI. Analyze this selfie and return ONLY valid JSON with this structure: 
+const PROMPT = `You are a professional esthetician and facial analyst AI. Analyze this selfie and return ONLY valid JSON with this structure: 
 { 
-  "faceShape": { "shape": string, "confidence": number, "description": string, "recommendedStyles": string[] }, 
+  "faceShape": { "shape": string, "confidence": number, "description": string, "recommendedFacialFeatures": string[] }, 
   "skinTone": { "undertone": string, "confidence": number, "complexion": string, "treatments": string[] }, 
-  "hairTexture": { "type": string, "confidence": number, "condition": string, "treatments": string[] },
   "beautyProfileScore": number 
 }`;
 
@@ -34,7 +33,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Image required" }, { status: 400 });
   }
 
-  let analysis = BEAUTY_AI_FALLBACK;
+  let analysis = {
+    faceShape: { shape: "Oval", confidence: 0.85, description: "Balanced proportions", recommendedFacialFeatures: ["Contouring", "Highlighting"] },
+    skinTone: { undertone: "Neutral", confidence: 0.9, complexion: "Clear", treatments: ["Hydration", "SPF"] },
+    beautyProfileScore: 92
+  };
 
   try {
     let text = "";
@@ -64,13 +67,11 @@ export async function POST(req: NextRequest) {
     }
   } catch (err) {
     console.error("Beauty AI failed:", err);
-    analysis = BEAUTY_AI_FALLBACK;
   }
 
   const salons = await getSalons();
   const treatments = [
     ...(analysis.skinTone?.treatments || []),
-    ...(analysis.hairTexture?.treatments || []),
   ];
   const matched = salons
     .filter((s) =>

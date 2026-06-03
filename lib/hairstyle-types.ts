@@ -1,7 +1,7 @@
 export type HairstyleAnalysis = {
-  faceShape: string;
-  skinTone: string;
   hairType: string;
+  hairTexture: string;
+  hairCondition: string;
   recommendedHairstyle: string;
   confidence: number;
 };

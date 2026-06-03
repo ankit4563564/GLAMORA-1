@@ -203,28 +203,20 @@ export function HairstyleTryOn() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-cream-muted">Face Shape</p>
-                  <p className="text-sm text-cream font-medium">{previewData.analysis.faceShape}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-cream-muted">Hair Type & Texture</p>
+                  <p className="text-sm text-cream font-medium">{previewData.analysis.hairType} · {previewData.analysis.hairTexture}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-cream-muted">Match Confidence</p>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-success">{previewData.analysis.confidence}%</span>
-                    <div className="h-1.5 w-full max-w-[60px] rounded-full bg-white/10 overflow-hidden">
-                        <div 
-                          className="h-full bg-success transition-all duration-1000" 
-                          style={{ width: `${previewData.analysis.confidence}%` }} 
-                        />
-                    </div>
-                  </div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-cream-muted">Condition</p>
+                  <p className="text-sm text-cream font-medium">{previewData.analysis.hairCondition}</p>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-cream-muted">AI Insights</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-cream-muted">AI Transformation Insight</p>
                 <div className="flex items-start gap-2 rounded-lg bg-violet-500/5 p-3 text-xs text-cream-muted border border-violet-500/10">
                    <Sparkles className="mt-0.5 h-3 w-3 shrink-0 text-violet-400" />
-                   <p>This style balances your {previewData.analysis.faceShape.toLowerCase()} face shape by adding volume where needed most.</p>
+                   <p>Based on your {previewData.analysis.hairTexture.toLowerCase()} hair texture, this {previewData.analysis.recommendedHairstyle.toLowerCase()} style adds the perfect amount of definition and volume.</p>
                 </div>
               </div>
             </div>
