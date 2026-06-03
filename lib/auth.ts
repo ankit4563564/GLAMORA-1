@@ -10,7 +10,7 @@ export async function getUserId(): Promise<string | null> {
   }
   try {
     const { userId } = await auth();
-    return userId;
+    return userId ?? DEMO_USER_ID;
   } catch (err) {
     console.warn("Auth check failed, falling back to demo user", err);
     return DEMO_USER_ID;
