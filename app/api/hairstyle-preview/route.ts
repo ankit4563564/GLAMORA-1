@@ -85,17 +85,26 @@ export async function POST(req: NextRequest) {
     const model = "runwayml/stable-diffusion-v1-5";
     console.log(`Phase 2: Generating with ${model} (Binary Mode)...`);
     
-    const hfResponse = await fetch(
-      `https://api-inference.huggingface.co/models/${model}`,
-      {
-        headers: {
-          Authorization: `Bearer ${hfToken}`,
-          "Content-Type": "image/jpeg",
-        },
-        method: "POST",
-        body: buffer,
+    let hfResponse;
+    try {
+      hfResponse = await fetch(
+        `https://api-inference.huggingface.co/models/${model}`,
+        {
+          headers: {
+            Authorization: `Bearer ${hfToken}`,
+            "Content-Type": "image/jpeg",
+          },
+          method: "POST",
+          body: buffer,
+        }
+      );
+    } catch (fetchErr: any) {
+      console.error("Fetch Network Error:", fetchErr);
+      if (fetchErr.code === 'ENOTFOUND') {
+        throw new Error("Network Error: Could not connect to Hugging Face. Please check your internet connection or DNS settings.");
       }
-    );
+      throw fetchErr;
+    }
 
     if (!hfResponse.ok) {
       const errorText = await hfResponse.text();
