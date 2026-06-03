@@ -86,10 +86,14 @@ export async function POST(req: NextRequest) {
           negative_prompt: "deformed, blurry, bad anatomy, disfigured, different person",
           strength: 0.5,
         },
+        // Wait for the model to load if it's currently cold
+        options: {
+          wait_for_model: true,
+        }
       });
     } catch (hfErr: any) {
       console.error("Hugging Face Generation Error:", hfErr);
-      // If SDXL fails, try SD 1.5 as fallback
+      // If SDXL fails, try SD 1.5 as fallback with wait_for_model
       console.log("Attempting fallback to SD 1.5...");
       resultBlob = await hf.imageToImage({
         model: "runwayml/stable-diffusion-v1-5",
@@ -98,6 +102,9 @@ export async function POST(req: NextRequest) {
           prompt: `A professional ${analysis.recommendedHairstyle} hairstyle on this person.`,
           strength: 0.5,
         },
+        options: {
+          wait_for_model: true,
+        }
       });
     }
 
