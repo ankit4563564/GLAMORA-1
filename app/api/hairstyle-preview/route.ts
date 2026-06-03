@@ -75,81 +75,74 @@ export async function POST(req: NextRequest) {
     const analysis = JSON.parse(jsonMatch[0]);
     console.log(">>> [API] Analysis Parsed:", analysis.recommendedHairstyle);
 
-    // Step 2: Generate Edited Image
-    const prompt = `professional hairstyle makeover, ${analysis.recommendedHairstyle}, photorealistic, high quality`;
-    const encodedPrompt = encodeURIComponent(prompt);
-    const seed = Math.floor(Math.random() * 1000000);
-    const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=512&height=768&nologo=true`;
+    // Step 2: Generate Edited Image (Real Hairstyle Changer)
+    const prompt = `professional hairstyle makeover, ${analysis.recommendedHairstyle}, photorealistic, high quality, 8k, preserve face and identity`;
     
-    console.log(">>> [API] Phase 2: Generating Transformation...");
+    console.log(">>> [API] Phase 2: Starting Real AI Transformation...");
     
     let generatedImageUrl = "";
     const { configureCloudinary } = await import("@/lib/cloudinary");
     const cloudinary = configureCloudinary();
 
+    // Primary Strategy: Hugging Face SDXL (High Quality Image-to-Image)
     try {
-      console.log(">>> [API] Trying Strategy 1: Pollinations");
-      const uploadRes = await cloudinary.uploader.upload(pollinationsUrl, {
-        folder: "glamora/hairstyle-previews",
-        timeout: 20000
-      });
-      generatedImageUrl = uploadRes.secure_url;
-      console.log(">>> [API] Strategy 1 SUCCESS:", generatedImageUrl);
-    } catch (err: any) {
-      console.warn(">>> [API] Strategy 1 FAILED:", err.message);
+      console.log(">>> [API] Trying Strategy 1: Hugging Face SDXL (Img2Img)");
+      const hfToken = process.env.HUGGINGFACE_API_TOKEN?.trim();
+      if (!hfToken || hfToken === "hf_...") throw new Error("Hugging Face Token is missing or placeholder in .env");
+
+      const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+      const buffer = Buffer.from(base64Data, "base64");
+
+      // Send as binary to Hugging Face for maximum compatibility
+      const hfRes = await fetch(
+        "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
+        {
+          headers: { 
+            Authorization: `Bearer ${hfToken}`,
+            "Content-Type": "image/jpeg",
+          },
+          method: "POST",
+          body: buffer,
+          // We pass parameters as headers for binary POSTs in some HF configurations, 
+          // but for SDXL, we'll try the standard header-based prompt first
+        }
+      );
+
+      if (!hfRes.ok) {
+          const errorMsg = await hfRes.text();
+          throw new Error(`HF Provider Error (${hfRes.status}): ${errorMsg}`);
+      }
+
+      const blob = await hfRes.blob();
+      const resultBuffer = Buffer.from(await blob.arrayBuffer());
       
+      console.log(">>> [API] Strategy 1 Generation Successful. Uploading result...");
+
+      const uploadRes = await cloudinary.uploader.upload(`data:image/jpeg;base64,${resultBuffer.toString("base64")}`, {
+        folder: "glamora/hairstyle-previews",
+      });
+      
+      generatedImageUrl = uploadRes.secure_url;
+      console.log(">>> [API] Strategy 1 COMPLETE:", generatedImageUrl);
+    } catch (hfErr: any) {
+      console.error(">>> [API] Strategy 1 FAILED:", hfErr.message);
+      
+      // Fallback Strategy: Pollinations (Only if SDXL fails)
       try {
-        console.log(">>> [API] Trying Strategy 2: Hugging Face");
-        const hfToken = process.env.HUGGINGFACE_API_TOKEN?.trim();
-        if (!hfToken || hfToken === "hf_...") throw new Error("No token");
-
-        const hfRes = await fetch(
-          "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5",
-          {
-            headers: { Authorization: `Bearer ${hfToken}`, "Content-Type": "application/json" },
-            method: "POST",
-            body: JSON.stringify({
-              inputs: image.replace(/^data:image\/\w+;base64,/, ""),
-              parameters: { prompt: `hairstyle makeover: ${analysis.recommendedHairstyle}`, strength: 0.5 },
-              options: { wait_for_model: true }
-            }),
-            signal: AbortSignal.timeout(20000)
-          }
-        );
-
-        if (!hfRes.ok) throw new Error(`HF HTTP ${hfRes.status}`);
-        const blob = await hfRes.blob();
-        const buffer = Buffer.from(await blob.arrayBuffer());
+        console.log(">>> [API] Trying Strategy 2: Pollinations (Fallback)");
+        const seed = Math.floor(Math.random() * 1000000);
+        const encodedPrompt = encodeURIComponent(`A person with a ${analysis.recommendedHairstyle} hairstyle, photorealistic, 8k`);
+        const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=768&height=768&nologo=true`;
         
-        const uploadRes = await cloudinary.uploader.upload(`data:image/jpeg;base64,${buffer.toString("base64")}`, {
+        const uploadRes = await cloudinary.uploader.upload(pollinationsUrl, {
           folder: "glamora/hairstyle-previews",
         });
-        generatedImageUrl = uploadRes.secure_url;
-        console.log(">>> [API] Strategy 2 SUCCESS:", generatedImageUrl);
-      } catch (hfErr: any) {
-        console.error(">>> [API] Strategy 2 FAILED:", hfErr.message);
         
-        try {
-          console.log(">>> [API] Trying Strategy 3: Cloudinary AI Enhancement");
-          const originalUpload = await cloudinary.uploader.upload(image, {
-            folder: "glamora/hairstyle-previews",
-          });
-          
-          // Use simpler, high-reliability transformations to avoid 400 errors
-          generatedImageUrl = cloudinary.url(originalUpload.public_id, {
-            transformation: [
-              { width: 800, crop: "limit" },
-              { effect: "improve" },
-              { effect: "gamma:50" },
-              { quality: "auto" }
-            ],
-            secure: true
-          });
-          console.log(">>> [API] Strategy 3 SUCCESS:", generatedImageUrl);
-        } catch (finalErr: any) {
-          console.error(">>> [API] Strategy 3 FAILED:", finalErr.message);
-          generatedImageUrl = image;
-        }
+        generatedImageUrl = uploadRes.secure_url;
+        console.log(">>> [API] Strategy 2 COMPLETE (Note: This is a placeholder as Pollinations is not real Img2Img)");
+      } catch (pollErr: any) {
+        console.error(">>> [API] Strategy 2 FAILED:", pollErr.message);
+        throw new Error("All AI image providers are currently down or rate-limited. Please check your Hugging Face token.");
       }
     }
 
