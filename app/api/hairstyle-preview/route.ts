@@ -69,11 +69,12 @@ export async function POST(req: NextRequest) {
     const blob = new Blob([buffer], { type: "image/jpeg" });
 
     const resultBlob = await hf.imageToImage({
-      model: "timbrooks/instruct-pix2pix",
+      model: "stabilityai/stable-diffusion-2-1",
       inputs: blob,
       parameters: {
-        prompt: `give this person a professional ${analysis.recommendedHairstyle} hairstyle. Keep their face and identity exactly the same. Only change the hair.`,
-        negative_prompt: "deformed, distorted, disfigured, poorly drawn face, bad anatomy, wrong identity, cartoon, anime, illustration, painting",
+        prompt: `A high-quality, photorealistic professional beauty industry portrait of the same person with a ${analysis.recommendedHairstyle} hairstyle. Professional salon makeover, studio lighting.`,
+        negative_prompt: "deformed, distorted, disfigured, poorly drawn face, bad anatomy, wrong identity, cartoon, anime, illustration, painting, blurry",
+        strength: 0.6,
       },
     });
 
