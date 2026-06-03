@@ -326,7 +326,8 @@ export function BeautyAIUpload() {
                 <BeforeAfterSlider 
                   beforeImage={preview!} 
                   afterImage={preview!} 
-                  afterClassName="contrast-125 saturate-125 brightness-105"
+                  beforeClassName="saturate-[0.8] brightness-90"
+                  afterClassName="contrast-125 saturate-150 brightness-110 sepia-[0.1] hue-rotate-[5deg]"
                 />
                 <p className="mt-4 text-center text-[10px] font-bold uppercase tracking-widest text-cream-muted">
                   Slide to see recommended enhancement

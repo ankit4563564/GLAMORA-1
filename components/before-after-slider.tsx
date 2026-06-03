@@ -53,13 +53,14 @@ export function BeforeAfterSlider({
       onMouseLeave={handleMouseUp}
     >
       {/* After Image (Background) - The "New" Look */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 bg-violet-900/20">
         <Image
           src={afterImage}
           alt="After"
           fill
           className={`object-cover ${afterClassName || ""}`}
           unoptimized
+          priority
         />
       </div>
 
@@ -74,15 +75,19 @@ export function BeforeAfterSlider({
           fill
           className={`object-cover ${beforeClassName || ""}`}
           unoptimized
+          priority
         />
       </div>
 
       {/* Slider Line & Handle */}
       <div 
-        className="absolute bottom-0 top-0 z-20 w-1 bg-violet-500 shadow-[0_0_10px_rgba(139,92,246,0.8)] pointer-events-none"
+        className="absolute bottom-0 top-0 z-20 w-1 bg-violet-500 shadow-[0_0_15px_rgba(139,92,246,1)] pointer-events-none"
         style={{ left: `${sliderPosition}%` }}
       >
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-violet-600 border-2 border-white/20 shadow-lg flex items-center justify-center pointer-events-auto transition-transform active:scale-90">
+        {/* Scan line effect */}
+        <div className="absolute inset-0 w-8 -left-4 bg-gradient-to-r from-transparent via-violet-500/20 to-transparent" />
+        
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-violet-600 border-2 border-white/20 shadow-[0_0_20px_rgba(139,92,246,0.5)] flex items-center justify-center pointer-events-auto transition-transform active:scale-90 hover:scale-110">
           <MoveHorizontal className="text-white h-5 w-5" />
         </div>
       </div>
