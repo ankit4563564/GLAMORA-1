@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Step 1: Analyze with AI Vision (Gemini or Groq)
+    console.log("Phase 1: Starting Vision Analysis...");
     let text = "";
     try {
       if (isGroqConfigured()) {
@@ -68,6 +69,7 @@ export async function POST(req: NextRequest) {
       console.error("Vision Analysis Error:", visionErr);
       throw new Error(`Vision analysis failed: ${visionErr.message}`);
     }
+    console.log("Phase 1: Vision Analysis Complete.");
     
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
@@ -75,75 +77,52 @@ export async function POST(req: NextRequest) {
     }
     const analysis = JSON.parse(jsonMatch[0]);
 
-    // Step 2: Generate Edited Image using Hugging Face (Multi-model Fallback with Direct Fetch)
+    // Step 2: Generate Edited Image using Hugging Face (Optimized for speed)
     const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
     
-    const models = [
-      "stabilityai/stable-diffusion-xl-base-1.0",
-      "stabilityai/sdxl-turbo",
-      "runwayml/stable-diffusion-v1-5",
-      "prompthero/openjourney"
-    ];
-
-    let resultBlob: Blob | null = null;
-    let lastErrorMsg = "";
-
-    for (const model of models) {
-      try {
-        console.log(`Directly fetching from ${model}...`);
-        const hfResponse = await fetch(
-          `https://api-inference.huggingface.co/models/${model}`,
-          {
-            headers: {
-              Authorization: `Bearer ${hfToken}`,
-              "Content-Type": "application/json",
-              "x-use-cache": "false",
-            },
-            method: "POST",
-            body: JSON.stringify({
-              inputs: base64Data,
-              parameters: {
-                prompt: `A professional beauty industry portrait with a ${analysis.recommendedHairstyle} hairstyle. Photorealistic, 8k, highly detailed.`,
-                negative_prompt: "deformed, blurry, bad anatomy, disfigured",
-                strength: 0.5,
-              },
-              options: {
-                wait_for_model: true,
-              }
-            }),
+    // We use sdxl-turbo as it is significantly faster (1-2s) than other models,
+    // which helps avoid the 10s serverless timeout limit.
+    const model = "stabilityai/sdxl-turbo";
+    console.log(`Phase 2: Starting AI Generation with ${model}...`);
+    
+    const hfResponse = await fetch(
+      `https://api-inference.huggingface.co/models/${model}`,
+      {
+        headers: {
+          Authorization: `Bearer ${hfToken}`,
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+        body: JSON.stringify({
+          inputs: base64Data,
+          parameters: {
+            prompt: `professional beauty industry portrait, ${analysis.recommendedHairstyle} hairstyle, photorealistic, 8k`,
+            negative_prompt: "deformed, blurry",
+            strength: 0.5,
+            num_inference_steps: 2,
+            guidance_scale: 0.0,
+          },
+          options: {
+            wait_for_model: true,
           }
-        );
-
-        if (hfResponse.ok) {
-          resultBlob = await hfResponse.blob();
-          console.log(`Successfully generated with ${model}`);
-          break;
-        } else {
-          const errorData = await hfResponse.json().catch(() => ({}));
-          const msg = errorData.error || hfResponse.statusText;
-          console.error(`Model ${model} failed: ${msg}`);
-          lastErrorMsg = msg;
-          
-          // If it's an auth error, no point in trying other models with the same token
-          if (hfResponse.status === 401 || msg.toLowerCase().includes("auth") || msg.toLowerCase().includes("invalid")) {
-             throw new Error("Your Hugging Face API token is invalid or unauthorized. Please check your .env file.");
-          }
-        }
-      } catch (err: any) {
-        console.error(`Fetch error with ${model}:`, err.message);
-        if (err.message.includes("token is invalid")) throw err;
-        lastErrorMsg = err.message;
-        continue;
+        }),
       }
+    );
+
+    if (!hfResponse.ok) {
+      const errorData = await hfResponse.json().catch(() => ({}));
+      throw new Error(errorData.error || `AI Generation failed: ${hfResponse.statusText}`);
     }
 
-    if (!resultBlob) {
-      throw new Error(lastErrorMsg || "All Hugging Face models failed. Please verify your API token and try again later.");
-    }
+    const resultBlob = await hfResponse.blob();
+    console.log("Phase 2: AI Generation Complete.");
 
+    // Step 3: Upload to Cloudinary
+    console.log("Phase 3: Uploading to Cloudinary...");
     const arrayBuffer = await resultBlob.arrayBuffer();
     const resultBase64 = Buffer.from(arrayBuffer).toString("base64");
     const generatedImageUrl = await uploadBase64Image(resultBase64, "glamora/hairstyle-previews");
+    console.log("Phase 3: Upload Complete.");
 
     const response: HairstylePreviewResponse = {
       analysis: {

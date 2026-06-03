@@ -83,12 +83,16 @@ export function HairstyleTryOn() {
         body: JSON.stringify({ image }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to generate preview");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Server error (${res.status}): ${res.statusText}`);
+      }
 
+      const data = await res.json();
       setPreviewData(data);
     } catch (err: any) {
-      setError(err.message);
+      console.error("AI Preview Error:", err);
+      setError(err.message || "Connection failed. The AI might be under heavy load, please try again.");
     } finally {
       clearInterval(interval);
       setLoading(false);
