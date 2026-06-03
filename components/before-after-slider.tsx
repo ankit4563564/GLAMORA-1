@@ -39,7 +39,7 @@ export function BeforeAfterSlider({
         setIsLoading(false);
         setHasError(true);
       }
-    }, 20000); // 20 seconds timeout for AI generation
+    }, 30000); // 30 seconds timeout
     
     return () => clearTimeout(timer);
   }, [isLoading]);
@@ -98,6 +98,7 @@ export function BeforeAfterSlider({
         <img
           src={afterImage}
           alt="After"
+          crossOrigin="anonymous"
           className={`h-full w-full object-cover transition-opacity duration-500 ${afterClassName || ""}`}
           onLoad={() => {
             console.log("AI Image Loaded Successfully");
@@ -120,7 +121,7 @@ export function BeforeAfterSlider({
              </div>
              <div className="text-center space-y-1">
                 <p className="text-xs font-bold uppercase tracking-widest text-white">Generating AI Look</p>
-                <p className="text-[10px] text-cream-muted">This may take up to 20 seconds...</p>
+                <p className="text-[10px] text-cream-muted">This may take up to 30 seconds...</p>
              </div>
           </div>
         </div>
@@ -134,17 +135,27 @@ export function BeforeAfterSlider({
              </div>
              <div className="space-y-1">
                 <p className="text-sm font-bold text-white">AI Generation Timeout</p>
-                <p className="text-xs text-cream-muted">The provider is taking longer than expected. Please try again.</p>
+                <p className="text-xs text-cream-muted">The provider is taking too long. You can try to view the image directly or reload.</p>
              </div>
-             <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => window.location.reload()}
-                className="mt-2 border-white/10 hover:bg-white/5"
-              >
-                <RefreshCw className="mr-2 h-3 w-3" />
-                Reload Page
-             </Button>
+             <div className="flex flex-col gap-2 w-full max-w-[200px]">
+               <Button 
+                  variant="ai" 
+                  size="sm" 
+                  onClick={() => window.open(afterImage, '_blank')}
+                  asChild
+                >
+                  <a href={afterImage} target="_blank" rel="noreferrer">View Image Directly</a>
+               </Button>
+               <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => window.location.reload()}
+                  className="border-white/10 hover:bg-white/5"
+                >
+                  <RefreshCw className="mr-2 h-3 w-3" />
+                  Reload Page
+               </Button>
+             </div>
           </div>
         </div>
       )}
