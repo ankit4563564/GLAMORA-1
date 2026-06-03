@@ -69,21 +69,36 @@ export async function POST(req: NextRequest) {
     const seed = Math.floor(Math.random() * 1000000);
     const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=512&height=768&nologo=true`;
     
-    console.log("Phase 2: Fetching from Pollinations (Server-Side)...");
+    console.log("Phase 2: Generating AI Image via Cloudinary Proxy...");
     
     let generatedImageUrl = "";
     try {
-      const imgRes = await fetch(pollinationsUrl);
-      if (!imgRes.ok) throw new Error("Pollinations fetch failed");
+      // We use Cloudinary to fetch the image from Pollinations.
+      // This bypasses any local network blocks because Cloudinary's servers do the fetching.
+      const { uploadBase64Image, configureCloudinary } = await import("@/lib/cloudinary");
+      const cloudinary = configureCloudinary();
       
-      const arrayBuffer = await imgRes.arrayBuffer();
-      const base64 = Buffer.from(arrayBuffer).toString("base64");
-      generatedImageUrl = `data:image/jpeg;base64,${base64}`;
-      console.log("Phase 2: Server-side fetch successful.");
+      const uploadRes = await cloudinary.uploader.upload(pollinationsUrl, {
+        folder: "glamora/hairstyle-previews",
+        transformation: [{ width: 800, crop: "limit" }]
+      });
+      
+      generatedImageUrl = uploadRes.secure_url;
+      console.log("Phase 2: Cloudinary Proxy Successful.");
     } catch (err) {
-      console.error("Pollinations server-side fetch failed:", err);
-      // Fallback to direct URL if server-side fetch fails
-      generatedImageUrl = pollinationsUrl;
+      console.error("Cloudinary Proxy Failed, falling back to server-side fetch:", err);
+      
+      // Fallback: Try to fetch it directly on the server if Cloudinary fails
+      try {
+        const imgRes = await fetch(pollinationsUrl);
+        const arrayBuffer = await imgRes.arrayBuffer();
+        const base64 = Buffer.from(arrayBuffer).toString("base64");
+        generatedImageUrl = `data:image/jpeg;base64,${base64}`;
+        console.log("Phase 2: Server-side fetch successful.");
+      } catch (fallbackErr) {
+        console.error("All fetch methods failed:", fallbackErr);
+        generatedImageUrl = pollinationsUrl; // Last resort
+      }
     }
 
     const response: HairstylePreviewResponse = {
