@@ -39,7 +39,7 @@ export function BeforeAfterSlider({
         setIsLoading(false);
         setHasError(true);
       }
-    }, 30000); // 30 seconds timeout
+    }, 45000); // 45 seconds timeout
     
     return () => clearTimeout(timer);
   }, [isLoading]);
@@ -92,13 +92,12 @@ export function BeforeAfterSlider({
         className="absolute inset-0 z-10 pointer-events-none"
         style={{ 
           clipPath: `inset(0 ${100 - sliderPosition}% 0 0)`,
-          opacity: (isLoading || hasError) ? 0 : 1 
+          opacity: hasError ? 0 : 1 
         }}
       >
         <img
           src={afterImage}
           alt="After"
-          crossOrigin="anonymous"
           className={`h-full w-full object-cover transition-opacity duration-500 ${afterClassName || ""}`}
           onLoad={() => {
             console.log("AI Image Loaded Successfully");
@@ -121,7 +120,7 @@ export function BeforeAfterSlider({
              </div>
              <div className="text-center space-y-1">
                 <p className="text-xs font-bold uppercase tracking-widest text-white">Generating AI Look</p>
-                <p className="text-[10px] text-cream-muted">This may take up to 30 seconds...</p>
+                <p className="text-[10px] text-cream-muted">Wait for transformation (30-45s)...</p>
              </div>
           </div>
         </div>
@@ -134,17 +133,16 @@ export function BeforeAfterSlider({
                 <AlertCircle className="h-6 w-6 text-rose-500" />
              </div>
              <div className="space-y-1">
-                <p className="text-sm font-bold text-white">AI Generation Timeout</p>
-                <p className="text-xs text-cream-muted">The provider is taking too long. You can try to view the image directly or reload.</p>
+                <p className="text-sm font-bold text-white">AI Provider Delayed</p>
+                <p className="text-xs text-cream-muted">The image is taking a while. You can open it directly or reload.</p>
              </div>
              <div className="flex flex-col gap-2 w-full max-w-[200px]">
                <Button 
                   variant="ai" 
                   size="sm" 
-                  onClick={() => window.open(afterImage, '_blank')}
                   asChild
                 >
-                  <a href={afterImage} target="_blank" rel="noreferrer">View Image Directly</a>
+                  <a href={afterImage} target="_blank" rel="noreferrer">Open Image Directly</a>
                </Button>
                <Button 
                   variant="outline" 

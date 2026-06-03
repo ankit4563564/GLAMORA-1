@@ -62,15 +62,13 @@ export async function POST(req: NextRequest) {
     }
     const analysis = JSON.parse(jsonMatch[0]);
 
-    // Step 2: Generate Edited Image using Pollinations AI (Ultra-reliable, No Token Required)
-    // Using simple keywords for faster generation
-    const prompt = `professional hairstyle makeover, ${analysis.recommendedHairstyle}, photorealistic, high quality, studio lighting`;
+    // Step 2: Generate Edited Image using Pollinations AI (Fast Default Model)
+    const prompt = `professional hairstyle, ${analysis.recommendedHairstyle}, high quality, realistic`;
     const encodedPrompt = encodeURIComponent(prompt);
     
-    // Pollinations generates a new image based on the prompt. 
-    // Using a simpler URL structure for better compatibility.
     const seed = Math.floor(Math.random() * 1000000);
-    const generatedImageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=768&height=768&nologo=true&model=turbo`;
+    // 512x768 is faster to generate and sufficient for mobile previews
+    const generatedImageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=512&height=768&nologo=true`;
     
     console.log("Phase 2: Pollinations URL generated.");
 
