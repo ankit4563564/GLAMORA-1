@@ -67,10 +67,24 @@ export async function POST(req: NextRequest) {
     const encodedPrompt = encodeURIComponent(prompt);
     
     const seed = Math.floor(Math.random() * 1000000);
-    // 512x768 is faster to generate and sufficient for mobile previews
-    const generatedImageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=512&height=768&nologo=true`;
+    const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=512&height=768&nologo=true`;
     
-    console.log("Phase 2: Pollinations URL generated.");
+    console.log("Phase 2: Fetching from Pollinations (Server-Side)...");
+    
+    let generatedImageUrl = "";
+    try {
+      const imgRes = await fetch(pollinationsUrl);
+      if (!imgRes.ok) throw new Error("Pollinations fetch failed");
+      
+      const arrayBuffer = await imgRes.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString("base64");
+      generatedImageUrl = `data:image/jpeg;base64,${base64}`;
+      console.log("Phase 2: Server-side fetch successful.");
+    } catch (err) {
+      console.error("Pollinations server-side fetch failed:", err);
+      // Fallback to direct URL if server-side fetch fails
+      generatedImageUrl = pollinationsUrl;
+    }
 
     const response: HairstylePreviewResponse = {
       analysis: {
