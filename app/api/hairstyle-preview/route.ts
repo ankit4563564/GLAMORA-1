@@ -19,75 +19,87 @@ Return ONLY valid JSON with this structure:
 Focus exclusively on hairstyle recommendations and hair characteristics.`;
 
 export async function POST(req: NextRequest) {
+  console.log(">>> [API] Hairstyle Preview Request Started");
   try {
     const userId = await getUserId();
+    console.log(">>> [API] Auth Check - User ID:", userId);
+    
     if (!userId) {
+      console.error(">>> [API] Auth Failed");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { image } = await req.json();
+    const body = await req.json().catch(e => {
+        console.error(">>> [API] Body Parse Error:", e);
+        return {};
+    });
+    
+    const { image } = body;
     if (!image) {
+      console.error(">>> [API] No Image Provided");
       return NextResponse.json({ error: "Image required" }, { status: 400 });
     }
 
-    // Step 1: Analyze with AI Vision (Gemini or Groq)
-    console.log("Phase 1: Starting Vision Analysis...");
+    console.log(">>> [API] Image Received. Length:", image.length);
+
+    // Step 1: Analyze with AI Vision
+    console.log(">>> [API] Phase 1: Starting Vision Analysis...");
     let text = "";
     try {
       if (isGroqConfigured()) {
+        console.log(">>> [API] Using Groq Vision");
         text = await groqVision({ prompt: ANALYSIS_PROMPT, image });
       } else {
+        console.log(">>> [API] Using Gemini Vision");
         const model = getVisionModel();
         const base64 = image.replace(/^data:image\/\w+;base64,/, "");
         const result = await model.generateContent([
           ANALYSIS_PROMPT,
           {
-            inlineData: {
-              mimeType: "image/jpeg",
-              data: base64,
-            },
+            inlineData: { mimeType: "image/jpeg", data: base64 },
           },
         ]);
         text = result.response.text();
       }
+      console.log(">>> [API] Vision Response Received:", text.substring(0, 100) + "...");
     } catch (visionErr: any) {
-      console.error("Vision Analysis Error:", visionErr);
+      console.error(">>> [API] Vision Analysis Failed:", visionErr.message);
       throw new Error(`Vision analysis failed: ${visionErr.message}`);
     }
-    console.log("Phase 1: Vision Analysis Complete.");
     
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
+      console.error(">>> [API] JSON Parse Error. Text was:", text);
       throw new Error("Failed to parse analysis from AI");
     }
     const analysis = JSON.parse(jsonMatch[0]);
+    console.log(">>> [API] Analysis Parsed:", analysis.recommendedHairstyle);
 
-    // Step 2: Generate Edited Image using Ultra-Resilient Strategy
+    // Step 2: Generate Edited Image
     const prompt = `professional hairstyle makeover, ${analysis.recommendedHairstyle}, photorealistic, high quality`;
     const encodedPrompt = encodeURIComponent(prompt);
     const seed = Math.floor(Math.random() * 1000000);
     const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=512&height=768&nologo=true`;
     
-    console.log("Phase 2: Generating AI Image (Ultra-Resilient Mode)...");
+    console.log(">>> [API] Phase 2: Generating Transformation...");
     
     let generatedImageUrl = "";
     const { configureCloudinary } = await import("@/lib/cloudinary");
     const cloudinary = configureCloudinary();
 
-    // Strategy 1: Pollinations via Cloudinary Proxy
     try {
-      console.log("Strategy 1: Pollinations...");
+      console.log(">>> [API] Trying Strategy 1: Pollinations");
       const uploadRes = await cloudinary.uploader.upload(pollinationsUrl, {
         folder: "glamora/hairstyle-previews",
-        timeout: 15000
+        timeout: 20000
       });
       generatedImageUrl = uploadRes.secure_url;
-      console.log("Success with Pollinations.");
-    } catch (err) {
-      console.warn("Pollinations busy/blocked, trying Strategy 2: Hugging Face...");
+      console.log(">>> [API] Strategy 1 SUCCESS:", generatedImageUrl);
+    } catch (err: any) {
+      console.warn(">>> [API] Strategy 1 FAILED:", err.message);
       
-      // Strategy 2: Hugging Face Fallback
       try {
+        console.log(">>> [API] Trying Strategy 2: Hugging Face");
         const hfToken = process.env.HUGGINGFACE_API_TOKEN?.trim();
         if (!hfToken || hfToken === "hf_...") throw new Error("No token");
 
@@ -101,11 +113,11 @@ export async function POST(req: NextRequest) {
               parameters: { prompt: `hairstyle makeover: ${analysis.recommendedHairstyle}`, strength: 0.5 },
               options: { wait_for_model: true }
             }),
-            signal: AbortSignal.timeout(15000)
+            signal: AbortSignal.timeout(20000)
           }
         );
 
-        if (!hfRes.ok) throw new Error("HF failed");
+        if (!hfRes.ok) throw new Error(`HF HTTP ${hfRes.status}`);
         const blob = await hfRes.blob();
         const buffer = Buffer.from(await blob.arrayBuffer());
         
@@ -113,48 +125,44 @@ export async function POST(req: NextRequest) {
           folder: "glamora/hairstyle-previews",
         });
         generatedImageUrl = uploadRes.secure_url;
-        console.log("Success with Hugging Face.");
-      } catch (hfErr) {
-        console.error("AI Models failed, using Strategy 3: Cloudinary AI Enhancement (Guaranteed Success)");
+        console.log(">>> [API] Strategy 2 SUCCESS:", generatedImageUrl);
+      } catch (hfErr: any) {
+        console.error(">>> [API] Strategy 2 FAILED:", hfErr.message);
         
-        // Strategy 3: Guaranteed Success - Use Cloudinary's AI to enhance the original image
-        // This ensures the "After" photo is always visible and looks distinct/better.
         try {
+          console.log(">>> [API] Trying Strategy 3: Cloudinary AI Enhancement");
           const originalUpload = await cloudinary.uploader.upload(image, {
             folder: "glamora/hairstyle-previews",
           });
           
-          // Apply "AI Improve", "Vibrant", and "Sharpen" to create a "Salon Finish" version
           generatedImageUrl = cloudinary.url(originalUpload.public_id, {
             transformation: [
               { effect: "improve:outdoor" },
               { effect: "vibrant:30" },
               { effect: "sharpen:50" },
-              { border: "2px_solid_rgb:8b5cf6" }, // Subtle violet border to signify AI work
+              { border: "2px_solid_rgb:8b5cf6" },
               { width: 800, crop: "limit" }
             ]
           });
-          console.log("Success with Cloudinary AI Enhancement.");
-        } catch (finalErr) {
-          console.error("Total failure:", finalErr);
-          generatedImageUrl = image; // Ultimate fallback: return original
+          console.log(">>> [API] Strategy 3 SUCCESS:", generatedImageUrl);
+        } catch (finalErr: any) {
+          console.error(">>> [API] Strategy 3 FAILED:", finalErr.message);
+          generatedImageUrl = image;
         }
       }
     }
 
     const response: HairstylePreviewResponse = {
-      analysis: {
-        ...analysis,
-        confidence: analysis.confidence || 94,
-      },
+      analysis: { ...analysis, confidence: analysis.confidence || 94 },
       generatedImageUrl,
     };
 
+    console.log(">>> [API] Request Completed Successfully");
     return NextResponse.json(response);
   } catch (error: any) {
-    console.error("Hairstyle Preview Error:", error);
+    console.error(">>> [API] CRITICAL FAILURE:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to generate hairstyle preview" },
+      { error: `API Error: ${error.message}` },
       { status: 500 }
     );
   }
