@@ -135,14 +135,15 @@ export async function POST(req: NextRequest) {
             folder: "glamora/hairstyle-previews",
           });
           
+          // Use simpler, high-reliability transformations to avoid 400 errors
           generatedImageUrl = cloudinary.url(originalUpload.public_id, {
             transformation: [
-              { effect: "improve:outdoor" },
-              { effect: "vibrant:30" },
-              { effect: "sharpen:50" },
-              { border: "2px_solid_rgb:8b5cf6" },
-              { width: 800, crop: "limit" }
-            ]
+              { width: 800, crop: "limit" },
+              { effect: "improve" },
+              { effect: "gamma:50" },
+              { quality: "auto" }
+            ],
+            secure: true
           });
           console.log(">>> [API] Strategy 3 SUCCESS:", generatedImageUrl);
         } catch (finalErr: any) {
