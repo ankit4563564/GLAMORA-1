@@ -8,6 +8,7 @@ import { Upload, Camera, RotateCcw } from "lucide-react";
 import { Button } from "./ui/button";
 import { Skeleton } from "./ui/skeleton";
 import { BeautyAICamera } from "./beauty-ai-camera";
+import { BeforeAfterSlider } from "./before-after-slider";
 
 const STEPS = [
   "Analyzing facial geometry…",
@@ -321,24 +322,15 @@ export function BeautyAIUpload() {
           >
             <div className="glass-card p-6 border-cyan-400/20">
               <h3 className="mb-6 text-xs font-bold uppercase tracking-widest text-cyan-400">AI Preview: Before & After</h3>
-              <div className="grid gap-6 sm:grid-cols-2">
-                <div className="space-y-3">
-                  <p className="text-center text-[10px] font-bold uppercase tracking-widest text-cream-muted">Current Look</p>
-                  <div className="relative aspect-square overflow-hidden rounded-2xl border border-white/10">
-                    <Image src={preview!} alt="Current" fill className="object-cover grayscale-[0.3]" unoptimized />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                    <div className="absolute bottom-3 left-3 text-[10px] font-bold text-white uppercase tracking-widest">Baseline</div>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <p className="text-center text-[10px] font-bold uppercase tracking-widest text-gold">Recommended Look</p>
-                  <div className="relative aspect-square overflow-hidden rounded-2xl border border-gold/30 shadow-gold-glow-sm">
-                    <Image src={preview!} alt="Recommended" fill className="object-cover contrast-125 saturate-150 brightness-110" unoptimized />
-                    <div className="absolute inset-0 bg-violet-500/10 mix-blend-overlay" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-gold/40 to-transparent" />
-                    <div className="absolute bottom-3 left-3 text-[10px] font-bold text-white uppercase tracking-widest">Enhanced</div>
-                  </div>
-                </div>
+              <div className="mx-auto max-w-md">
+                <BeforeAfterSlider 
+                  beforeImage={preview!} 
+                  afterImage={preview!} 
+                  afterClassName="contrast-125 saturate-125 brightness-105"
+                />
+                <p className="mt-4 text-center text-[10px] font-bold uppercase tracking-widest text-cream-muted">
+                  Slide to see recommended enhancement
+                </p>
               </div>
               <p className="mt-6 text-center text-xs text-cream-muted italic">
                 {'"'}AI visualization of recommended {analysis.faceShape.recommendedStyles[0]} with specialized {analysis.skinTone.treatments[0]}{'"'}

@@ -7,10 +7,18 @@ import { MoveHorizontal } from "lucide-react";
 interface BeforeAfterSliderProps {
   beforeImage: string;
   afterImage: string;
+  beforeClassName?: string;
+  afterClassName?: string;
 }
 
-export function BeforeAfterSlider({ beforeImage, afterImage }: BeforeAfterSliderProps) {
+export function BeforeAfterSlider({ 
+  beforeImage, 
+  afterImage,
+  beforeClassName,
+  afterClassName
+}: BeforeAfterSliderProps) {
   const [sliderPosition, setSliderPosition] = useState(50);
+  const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleMove = (clientX: number) => {
@@ -22,12 +30,17 @@ export function BeforeAfterSlider({ beforeImage, afterImage }: BeforeAfterSlider
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (e.buttons === 1) handleMove(e.clientX);
+    if (isDragging || e.buttons === 1) {
+      handleMove(e.clientX);
+    }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     handleMove(e.touches[0].clientX);
   };
+
+  const handleMouseDown = () => setIsDragging(true);
+  const handleMouseUp = () => setIsDragging(false);
 
   return (
     <div 
@@ -35,6 +48,9 @@ export function BeforeAfterSlider({ beforeImage, afterImage }: BeforeAfterSlider
       className="relative aspect-square w-full overflow-hidden rounded-2xl border border-white/10 shadow-glass-lg cursor-ew-resize select-none"
       onMouseMove={handleMouseMove}
       onTouchMove={handleTouchMove}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
     >
       {/* After Image (Background) - The "New" Look */}
       <div className="absolute inset-0">
@@ -42,7 +58,7 @@ export function BeforeAfterSlider({ beforeImage, afterImage }: BeforeAfterSlider
           src={afterImage}
           alt="After"
           fill
-          className="object-cover"
+          className={`object-cover ${afterClassName || ""}`}
           unoptimized
         />
       </div>
@@ -56,7 +72,7 @@ export function BeforeAfterSlider({ beforeImage, afterImage }: BeforeAfterSlider
           src={beforeImage}
           alt="Before"
           fill
-          className="object-cover"
+          className={`object-cover ${beforeClassName || ""}`}
           unoptimized
         />
       </div>
@@ -66,7 +82,7 @@ export function BeforeAfterSlider({ beforeImage, afterImage }: BeforeAfterSlider
         className="absolute bottom-0 top-0 z-20 w-1 bg-violet-500 shadow-[0_0_10px_rgba(139,92,246,0.8)] pointer-events-none"
         style={{ left: `${sliderPosition}%` }}
       >
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-violet-600 border-2 border-white/20 shadow-lg flex items-center justify-center pointer-events-auto">
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-violet-600 border-2 border-white/20 shadow-lg flex items-center justify-center pointer-events-auto transition-transform active:scale-90">
           <MoveHorizontal className="text-white h-5 w-5" />
         </div>
       </div>
