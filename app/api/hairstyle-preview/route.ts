@@ -29,9 +29,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!process.env.HUGGINGFACE_API_TOKEN) {
-      return NextResponse.json({ error: "Hugging Face API Token not configured" }, { status: 500 });
+    const hfToken = process.env.HUGGINGFACE_API_TOKEN?.trim();
+    if (!hfToken || hfToken === "hf_...") {
+      return NextResponse.json({ error: "Hugging Face API Token is missing or invalid in .env" }, { status: 500 });
     }
+
+    const hf = new HfInference(hfToken);
 
     const { image } = await req.json();
     if (!image) {
@@ -40,21 +43,26 @@ export async function POST(req: NextRequest) {
 
     // Step 1: Analyze with AI Vision (Gemini or Groq)
     let text = "";
-    if (isGroqConfigured()) {
-      text = await groqVision({ prompt: ANALYSIS_PROMPT, image });
-    } else {
-      const model = getVisionModel();
-      const base64 = image.replace(/^data:image\/\w+;base64,/, "");
-      const result = await model.generateContent([
-        ANALYSIS_PROMPT,
-        {
-          inlineData: {
-            mimeType: "image/jpeg",
-            data: base64,
+    try {
+      if (isGroqConfigured()) {
+        text = await groqVision({ prompt: ANALYSIS_PROMPT, image });
+      } else {
+        const model = getVisionModel();
+        const base64 = image.replace(/^data:image\/\w+;base64,/, "");
+        const result = await model.generateContent([
+          ANALYSIS_PROMPT,
+          {
+            inlineData: {
+              mimeType: "image/jpeg",
+              data: base64,
+            },
           },
-        },
-      ]);
-      text = result.response.text();
+        ]);
+        text = result.response.text();
+      }
+    } catch (visionErr: any) {
+      console.error("Vision Analysis Error:", visionErr);
+      throw new Error(`Vision analysis failed: ${visionErr.message}`);
     }
     
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -66,33 +74,33 @@ export async function POST(req: NextRequest) {
     // Step 2: Generate Edited Image using Hugging Face (Img2Img)
     const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
+    const blob = new Blob([buffer], { type: "image/jpeg" });
 
-    // Using fetch directly to have more control over headers and avoid "provider mapping" errors
-    const hfResponse = await fetch(
-      "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5",
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.HUGGINGFACE_API_TOKEN}`,
-          "Content-Type": "application/json",
+    let resultBlob;
+    try {
+      resultBlob = await hf.imageToImage({
+        model: "stabilityai/stable-diffusion-xl-base-1.0",
+        inputs: blob,
+        parameters: {
+          prompt: `A professional beauty industry portrait of the same person with a ${analysis.recommendedHairstyle} hairstyle. Photorealistic, high quality.`,
+          negative_prompt: "deformed, blurry, bad anatomy, disfigured, different person",
+          strength: 0.5,
         },
-        method: "POST",
-        body: JSON.stringify({
-          inputs: base64Data,
-          parameters: {
-            prompt: `A professional beauty industry portrait with a ${analysis.recommendedHairstyle} hairstyle. Photorealistic, 8k, highly detailed.`,
-            negative_prompt: "deformed, blurry, bad anatomy, disfigured",
-            strength: 0.5,
-          },
-        }),
-      }
-    );
-
-    if (!hfResponse.ok) {
-      const errorData = await hfResponse.json();
-      throw new Error(errorData.error || `Hugging Face API error: ${hfResponse.statusText}`);
+      });
+    } catch (hfErr: any) {
+      console.error("Hugging Face Generation Error:", hfErr);
+      // If SDXL fails, try SD 1.5 as fallback
+      console.log("Attempting fallback to SD 1.5...");
+      resultBlob = await hf.imageToImage({
+        model: "runwayml/stable-diffusion-v1-5",
+        inputs: blob,
+        parameters: {
+          prompt: `A professional ${analysis.recommendedHairstyle} hairstyle on this person.`,
+          strength: 0.5,
+        },
+      });
     }
 
-    const resultBlob = await hfResponse.blob();
     const arrayBuffer = await resultBlob.arrayBuffer();
     const resultBase64 = Buffer.from(arrayBuffer).toString("base64");
     const generatedImageUrl = await uploadBase64Image(resultBase64, "glamora/hairstyle-previews");
