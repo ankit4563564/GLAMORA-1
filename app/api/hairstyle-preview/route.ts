@@ -66,18 +66,33 @@ export async function POST(req: NextRequest) {
     // Step 2: Generate Edited Image using Hugging Face (Img2Img)
     const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
-    const blob = new Blob([buffer], { type: "image/jpeg" });
 
-    const resultBlob = await hf.imageToImage({
-      model: "stabilityai/stable-diffusion-2-1",
-      inputs: blob,
-      parameters: {
-        prompt: `A high-quality, photorealistic professional beauty industry portrait of the same person with a ${analysis.recommendedHairstyle} hairstyle. Professional salon makeover, studio lighting.`,
-        negative_prompt: "deformed, distorted, disfigured, poorly drawn face, bad anatomy, wrong identity, cartoon, anime, illustration, painting, blurry",
-        strength: 0.6,
-      },
-    });
+    // Using fetch directly to have more control over headers and avoid "provider mapping" errors
+    const hfResponse = await fetch(
+      "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5",
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.HUGGINGFACE_API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+        body: JSON.stringify({
+          inputs: base64Data,
+          parameters: {
+            prompt: `A professional beauty industry portrait with a ${analysis.recommendedHairstyle} hairstyle. Photorealistic, 8k, highly detailed.`,
+            negative_prompt: "deformed, blurry, bad anatomy, disfigured",
+            strength: 0.5,
+          },
+        }),
+      }
+    );
 
+    if (!hfResponse.ok) {
+      const errorData = await hfResponse.json();
+      throw new Error(errorData.error || `Hugging Face API error: ${hfResponse.statusText}`);
+    }
+
+    const resultBlob = await hfResponse.blob();
     const arrayBuffer = await resultBlob.arrayBuffer();
     const resultBase64 = Buffer.from(arrayBuffer).toString("base64");
     const generatedImageUrl = await uploadBase64Image(resultBase64, "glamora/hairstyle-previews");
