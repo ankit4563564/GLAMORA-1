@@ -19,7 +19,7 @@ export function BeforeAfterSlider({
 }: BeforeAfterSliderProps) {
   const [sliderPosition, setSliderPosition] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
-  const [error, setError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleMove = (clientX: number) => {
@@ -46,7 +46,7 @@ export function BeforeAfterSlider({
   return (
     <div 
       ref={containerRef}
-      className="relative aspect-square w-full overflow-hidden rounded-2xl border border-white/10 shadow-glass-lg cursor-ew-resize select-none"
+      className="relative aspect-square w-full overflow-hidden rounded-2xl border border-white/10 shadow-glass-lg cursor-ew-resize select-none bg-black"
       onMouseMove={handleMouseMove}
       onTouchMove={handleTouchMove}
       onMouseDown={handleMouseDown}
@@ -68,22 +68,26 @@ export function BeforeAfterSlider({
       {/* After Image (Clipped) - The "New" Look */}
       <div 
         className="absolute inset-0 z-10 pointer-events-none"
-        style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}
+        style={{ 
+          clipPath: `inset(0 ${100 - sliderPosition}% 0 0)`,
+          opacity: isLoading ? 0 : 1 
+        }}
       >
-        <Image
+        {/* Using standard img for AI URLs to avoid Next.js Image component overhead/timeouts */}
+        <img
           src={afterImage}
           alt="After"
-          fill
-          className={`object-cover ${afterClassName || ""}`}
-          unoptimized
-          priority
-          onError={() => setError(true)}
+          className={`h-full w-full object-cover ${afterClassName || ""}`}
+          onLoad={() => setIsLoading(false)}
         />
       </div>
 
-      {error && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 text-center">
-          <p className="text-sm text-rose-400">Failed to load AI preview. Please try generating again.</p>
+      {isLoading && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-2">
+             <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
+             <p className="text-[10px] font-bold uppercase tracking-widest text-white">Rendering AI...</p>
+          </div>
         </div>
       )}
 
