@@ -34,6 +34,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Hugging Face API Token is missing or invalid in .env" }, { status: 500 });
     }
 
+    // Masked logging for debugging (only shows first 4 and last 4 chars)
+    const maskedToken = `${hfToken.substring(0, 4)}...${hfToken.substring(hfToken.length - 4)}`;
+    console.log(`Using Hugging Face Token: ${maskedToken}`);
+
     const hf = new HfInference(hfToken);
 
     const { image } = await req.json();
@@ -78,28 +82,28 @@ export async function POST(req: NextRequest) {
 
     let resultBlob;
     try {
+      console.log("Attempting generation with sdxl-turbo...");
       resultBlob = await hf.imageToImage({
-        model: "stabilityai/stable-diffusion-xl-base-1.0",
+        model: "stabilityai/sdxl-turbo",
         inputs: blob,
         parameters: {
-          prompt: `A professional beauty industry portrait of the same person with a ${analysis.recommendedHairstyle} hairstyle. Photorealistic, high quality.`,
-          negative_prompt: "deformed, blurry, bad anatomy, disfigured, different person",
+          prompt: `A professional beauty portrait of the same person with a ${analysis.recommendedHairstyle} hairstyle. Photorealistic, 8k.`,
+          negative_prompt: "deformed, blurry, bad anatomy, disfigured",
           strength: 0.5,
         },
-        // Wait for the model to load if it's currently cold
         options: {
           wait_for_model: true,
         }
       });
     } catch (hfErr: any) {
       console.error("Hugging Face Generation Error:", hfErr);
-      // If SDXL fails, try SD 1.5 as fallback with wait_for_model
-      console.log("Attempting fallback to SD 1.5...");
+      // Final fallback to a very basic model
+      console.log("Attempting final fallback to SD 1.5...");
       resultBlob = await hf.imageToImage({
         model: "runwayml/stable-diffusion-v1-5",
         inputs: blob,
         parameters: {
-          prompt: `A professional ${analysis.recommendedHairstyle} hairstyle on this person.`,
+          prompt: `hairstyle makeover: ${analysis.recommendedHairstyle}`,
           strength: 0.5,
         },
         options: {
