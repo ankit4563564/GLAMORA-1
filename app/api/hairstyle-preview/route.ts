@@ -20,7 +20,8 @@ Focus exclusively on hairstyle recommendations and hair characteristics.`;
 // img2img models ordered by reliability — first one that works wins
 const IMG2IMG_MODELS = [
   "timbrooks/instruct-pix2pix",
-  "stabilityai/stable-diffusion-xl-refiner-1.0",
+  "runwayml/stable-diffusion-v1-5",
+  "stabilityai/stable-diffusion-2-1",
 ];
 
 async function analyzeHairWithVision(image: string): Promise<{
