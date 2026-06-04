@@ -3,7 +3,6 @@ import { getUserId } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { getVisionModel } from "@/lib/gemini";
 import { groqVision, isGroqConfigured } from "@/lib/groq";
-import { BEAUTY_AI_FALLBACK } from "@/lib/seed-data";
 import { getSalons } from "@/lib/salons";
 
 export const dynamic = "force-dynamic";
@@ -18,26 +17,42 @@ const PROMPT = `You are a professional esthetician and facial analyst AI. Analyz
 export async function POST(req: NextRequest) {
   const userId = await getUserId();
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Please sign in to use BeautyAI." }, { status: 401 });
   }
 
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  const limit = rateLimit(ip, 60_000);
+  const limit = rateLimit(ip, 30_000);
   if (!limit.allowed) {
-    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    return NextResponse.json(
+      { error: `Please wait ${limit.retryAfter || 30} seconds before trying again.` },
+      { status: 429 }
+    );
   }
 
-  const { image } = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const { image } = body;
   if (!image) {
     return NextResponse.json({ error: "Image required" }, { status: 400 });
   }
 
+  // Default analysis as fallback
   let analysis = {
-    faceShape: { shape: "Oval", confidence: 0.85, description: "Balanced proportions", recommendedFacialFeatures: ["Contouring", "Highlighting"] },
-    skinTone: { undertone: "Neutral", confidence: 0.9, complexion: "Clear", treatments: ["Hydration", "SPF"] },
-    beautyProfileScore: 92
+    faceShape: {
+      shape: "Oval",
+      confidence: 0.85,
+      description: "Balanced proportions with gently rounded jawline",
+      recommendedFacialFeatures: ["Contouring", "Highlighting", "Brow shaping"],
+    },
+    skinTone: {
+      undertone: "Neutral",
+      confidence: 0.9,
+      complexion: "Clear with even tone",
+      treatments: ["Hydration therapy", "SPF protection", "Vitamin C serum"],
+    },
+    beautyProfileScore: 88,
   };
+  let analysisError: string | null = null;
 
   try {
     let text = "";
@@ -64,32 +79,41 @@ export async function POST(req: NextRequest) {
       analysis = JSON.parse(jsonMatch[0]);
     } else {
       console.warn("Beauty AI invalid JSON response:", text);
+      analysisError = "AI returned an unexpected format. Showing estimated results.";
     }
-  } catch (err) {
-    console.error("Beauty AI failed:", err);
+  } catch (err: any) {
+    console.error("Beauty AI failed:", err.message);
+    analysisError = "AI vision service temporarily unavailable. Showing estimated results.";
   }
 
-  const salons = await getSalons();
-  const treatments = [
-    ...(analysis.skinTone?.treatments || []),
-  ];
-  const matched = salons
-    .filter((s) =>
-      s.services.some((svc) =>
-        treatments.some(
-          (t) =>
-            svc.name.toLowerCase().includes(t.split(" ")[0]?.toLowerCase() || "") ||
-            svc.category === "Skin" ||
-            svc.category === "Hair"
+  // Match salons based on treatments
+  let matched: { _id: string; name: string; area: string }[] = [];
+  try {
+    const salons = await getSalons();
+    const treatments = [...(analysis.skinTone?.treatments || [])];
+    matched = salons
+      .filter((s) =>
+        s.services.some((svc: any) =>
+          treatments.some(
+            (t) =>
+              svc.name.toLowerCase().includes(t.split(" ")[0]?.toLowerCase() || "") ||
+              svc.category === "Skin" ||
+              svc.category === "Hair"
+          )
         )
       )
-    )
-    .slice(0, 3);
+      .slice(0, 3);
 
-  const fallbackMatches = salons.slice(0, 3);
+    if (matched.length === 0) {
+      matched = salons.slice(0, 3);
+    }
+  } catch {
+    // Salons unavailable — that's okay, just return empty
+  }
 
   return NextResponse.json({
     analysis,
-    matchedSalons: matched.length ? matched : fallbackMatches,
+    matchedSalons: matched,
+    ...(analysisError && { warning: analysisError }),
   });
 }

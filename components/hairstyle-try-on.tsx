@@ -12,6 +12,7 @@ const LOADING_STEPS = [
   "Analyzing face geometry...",
   "Choosing perfect style...",
   "Generating AI preview...",
+  "Rendering transformation...",
 ];
 
 async function compressImage(base64: string): Promise<string> {
@@ -21,7 +22,7 @@ async function compressImage(base64: string): Promise<string> {
       const canvas = document.createElement("canvas");
       let width = img.width;
       let height = img.height;
-      const maxSide = 800;
+      const maxSide = 768;
       
       if (width > height) {
         if (width > maxSide) {
@@ -51,14 +52,21 @@ export function HairstyleTryOn() {
   const [loading, setLoading] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setError("Image too large. Please upload a photo under 5MB.");
+        return;
+      }
       const reader = new FileReader();
       reader.onload = async () => {
         const compressed = await compressImage(reader.result as string);
         setOriginalImage(compressed);
+        setError(null);
         generatePreview(compressed);
       };
       reader.readAsDataURL(file);
@@ -73,7 +81,7 @@ export function HairstyleTryOn() {
 
     const interval = setInterval(() => {
       setStepIndex((prev) => (prev < LOADING_STEPS.length - 1 ? prev + 1 : prev));
-    }, 2000);
+    }, 3000);
 
     try {
       const res = await fetch("/api/hairstyle-preview", {
@@ -84,17 +92,41 @@ export function HairstyleTryOn() {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `Server error (${res.status}): ${res.statusText}`);
+        throw new Error(errorData.error || `Server error (${res.status})`);
       }
 
       const data = await res.json();
+      
+      if (!data.generatedImageUrl) {
+        throw new Error("AI did not return a generated image. Please try again.");
+      }
+      
       setPreviewData(data);
+      setRetryCount(0);
     } catch (err: any) {
       console.error("AI Preview Error:", err);
-      setError(err.message || "Connection failed. The AI might be under heavy load, please try again.");
+      
+      // Provide user-friendly error messages
+      let userMessage = err.message || "Something went wrong. Please try again.";
+      if (userMessage.includes("rate")) {
+        userMessage = "AI is rate-limited. Free API tokens have limited requests per hour. Please wait a few minutes and try again.";
+      } else if (userMessage.includes("token") || userMessage.includes("Token")) {
+        userMessage = "AI API token issue. The Hugging Face token may be expired or invalid. Please check your .env configuration.";
+      } else if (userMessage.includes("401") || userMessage.includes("Unauthorized") || userMessage.includes("sign in")) {
+        userMessage = "Please sign in to use AI Hairstyle Preview.";
+      }
+      
+      setError(userMessage);
     } finally {
       clearInterval(interval);
       setLoading(false);
+    }
+  };
+
+  const handleRetry = () => {
+    if (originalImage) {
+      setRetryCount((c) => c + 1);
+      generatePreview(originalImage);
     }
   };
 
@@ -106,21 +138,32 @@ export function HairstyleTryOn() {
     link.click();
   };
 
+  const fullReset = () => {
+    setOriginalImage(null);
+    setPreviewData(null);
+    setError(null);
+    setLoading(false);
+    setStepIndex(0);
+    setRetryCount(0);
+  };
+
   return (
     <section className="space-y-8 rounded-3xl border border-white/10 bg-[#12131C]/50 p-6 backdrop-blur-xl sm:p-8">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-display text-2xl text-white">AI Hairstyle Preview</h2>
-          <p className="text-sm text-cream-muted">Experience your transformation in seconds</p>
+          <p className="text-sm text-cream-muted">Upload a selfie and AI will transform your hairstyle in real-time</p>
         </div>
         <Sparkles className="h-6 w-6 text-gold animate-pulse" />
       </div>
 
+      {/* Upload Area */}
       {!originalImage && !loading && (
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="flex min-h-[200px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-violet-500/40 bg-[#1A1C29]/50 p-8 transition-all hover:border-cyan-400/50 hover:bg-violet-500/5">
             <Upload className="mb-4 h-8 w-8 text-violet-400" />
             <p className="font-display text-lg text-cream">Upload Selfie</p>
+            <p className="mt-1 text-center text-xs text-cream-muted">JPG, PNG — Max 5MB</p>
             <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
           </label>
           <button 
@@ -129,10 +172,12 @@ export function HairstyleTryOn() {
           >
             <Camera className="mb-4 h-8 w-8 text-cream-muted" />
             <p className="font-display text-lg text-cream-muted">Live Camera</p>
+            <p className="mt-1 text-center text-xs text-cream-muted/60">Coming soon</p>
           </button>
         </div>
       )}
 
+      {/* Loading State */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <div className="relative mb-8 h-32 w-32">
@@ -142,7 +187,7 @@ export function HairstyleTryOn() {
                 <Sparkles className="h-8 w-8 text-gold animate-pulse" />
             </div>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-3">
             <AnimatePresence mode="wait">
               <motion.p
                 key={LOADING_STEPS[stepIndex]}
@@ -162,20 +207,49 @@ export function HairstyleTryOn() {
                 />
               ))}
             </div>
+            <p className="mt-2 text-xs text-cream-muted">
+              This may take 15–45 seconds depending on AI provider load
+            </p>
           </div>
         </div>
       )}
 
-      {error && (
-        <div className="flex flex-col items-center justify-center py-8 text-center text-rose-400">
-          <AlertCircle className="mb-4 h-12 w-12" />
-          <p className="text-lg font-medium">{error}</p>
-          <Button variant="outline" className="mt-4" onClick={() => setOriginalImage(null)}>
-            Try Again
-          </Button>
-        </div>
+      {/* Error State */}
+      {error && !loading && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center justify-center rounded-2xl border border-rose-500/30 bg-rose-500/5 py-8 px-6 text-center"
+        >
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-rose-500/10 border border-rose-500/20">
+            <AlertCircle className="h-7 w-7 text-rose-400" />
+          </div>
+          <p className="max-w-md text-sm font-medium text-rose-300">{error}</p>
+          {retryCount < 3 && originalImage && (
+            <p className="mt-2 text-xs text-cream-muted">
+              Retry attempt {retryCount + 1} of 3
+            </p>
+          )}
+          <div className="mt-4 flex gap-3">
+            {originalImage && retryCount < 3 && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="border-rose-500/30 hover:bg-rose-500/10"
+                onClick={handleRetry}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Retry
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={fullReset}>
+              Upload New Photo
+            </Button>
+          </div>
+        </motion.div>
       )}
 
+      {/* Results */}
       {previewData && originalImage && (
         <motion.div 
           initial={{ opacity: 0 }} 
@@ -240,7 +314,7 @@ export function HairstyleTryOn() {
             </div>
             
             <button 
-                onClick={() => setOriginalImage(null)}
+                onClick={fullReset}
                 className="text-center text-xs text-cream-muted hover:text-white transition-colors"
             >
                 Reset and upload new photo

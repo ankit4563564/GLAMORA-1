@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getVisionModel } from "@/lib/gemini";
-import { groqVision, isGroqConfigured } from "@/lib/groq";
-import { HairstylePreviewResponse } from "@/lib/hairstyle-types";
+import { InferenceClient } from "@huggingface/inference";
 import { getUserId } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -18,145 +17,221 @@ Return ONLY valid JSON with this structure:
 }
 Focus exclusively on hairstyle recommendations and hair characteristics.`;
 
+// img2img models ordered by reliability — first one that works wins
+const IMG2IMG_MODELS = [
+  "timbrooks/instruct-pix2pix",
+  "stabilityai/stable-diffusion-xl-refiner-1.0",
+];
+
+async function analyzeHairWithVision(image: string): Promise<{
+  hairType: string;
+  hairTexture: string;
+  hairCondition: string;
+  recommendedHairstyle: string;
+  confidence: number;
+}> {
+  // Try Groq first, then Gemini
+  const { isGroqConfigured, groqVision } = await import("@/lib/groq");
+  const { getVisionModel } = await import("@/lib/gemini");
+
+  let text = "";
+
+  if (isGroqConfigured()) {
+    text = await groqVision({ prompt: ANALYSIS_PROMPT, image });
+  } else {
+    const model = getVisionModel();
+    const base64 = image.replace(/^data:image\/\w+;base64,/, "");
+    const result = await model.generateContent([
+      ANALYSIS_PROMPT,
+      { inlineData: { mimeType: "image/jpeg", data: base64 } },
+    ]);
+    text = result.response.text();
+  }
+
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error("AI could not parse hair analysis from the image");
+  }
+
+  return JSON.parse(jsonMatch[0]);
+}
+
+async function generateHairstyleImage(
+  imageBase64: string,
+  recommendedStyle: string
+): Promise<Buffer> {
+  const hfToken = process.env.HUGGINGFACE_API_TOKEN?.trim();
+  if (!hfToken || hfToken.length < 10 || hfToken === "hf_...") {
+    throw new Error(
+      "HUGGINGFACE_API_TOKEN is missing or invalid. Please set a valid token in your .env file."
+    );
+  }
+
+  const hf = new InferenceClient(hfToken);
+
+  // Strip the data URL prefix to get raw base64, then convert to Buffer
+  const rawBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+  const inputBuffer = Buffer.from(rawBase64, "base64");
+  // Create a Blob from the buffer for the SDK
+  const inputBlob = new Blob([inputBuffer], { type: "image/jpeg" });
+
+  const prompt = `Change this person's hairstyle to a ${recommendedStyle}. Keep the face, skin, background, and clothing exactly the same. Only modify the hair style, length, and shape. Photorealistic result.`;
+
+  let lastError: Error | null = null;
+
+  for (const modelId of IMG2IMG_MODELS) {
+    try {
+      console.log(`>>> [API] Trying img2img model: ${modelId}`);
+
+      const result = await hf.imageToImage({
+        model: modelId,
+        inputs: inputBlob,
+        parameters: {
+          prompt,
+          negative_prompt:
+            "blurry, distorted face, extra limbs, cartoon, anime, low quality, deformed",
+          strength: 0.55,
+          guidance_scale: 7.5,
+          num_inference_steps: 30,
+        },
+      });
+
+      // result is a Blob — convert to Buffer
+      const arrayBuffer = await result.arrayBuffer();
+      const resultBuffer = Buffer.from(arrayBuffer);
+
+      if (resultBuffer.length < 1000) {
+        throw new Error(`Model ${modelId} returned too-small image (${resultBuffer.length} bytes)`);
+      }
+
+      console.log(`>>> [API] Model ${modelId} SUCCESS (${resultBuffer.length} bytes)`);
+      return resultBuffer;
+    } catch (err: any) {
+      console.error(`>>> [API] Model ${modelId} FAILED:`, err.message);
+      lastError = err;
+
+      // If rate limited, include that in the error
+      if (err.message?.includes("429") || err.message?.includes("rate")) {
+        lastError = new Error(
+          `AI model is rate-limited. Free HuggingFace tokens have limited requests/hour. Please wait a few minutes and try again.`
+        );
+      }
+
+      // If the model is loading (503), wait and retry once
+      if (err.message?.includes("503") || err.message?.includes("loading")) {
+        console.log(`>>> [API] Model ${modelId} is loading, waiting 20s for retry...`);
+        await new Promise((r) => setTimeout(r, 20000));
+        try {
+          const retryResult = await hf.imageToImage({
+            model: modelId,
+            inputs: inputBlob,
+            parameters: {
+              prompt,
+              negative_prompt: "blurry, distorted face, cartoon, anime, low quality",
+              strength: 0.55,
+              guidance_scale: 7.5,
+              num_inference_steps: 30,
+            },
+          });
+          const retryBuf = Buffer.from(await retryResult.arrayBuffer());
+          if (retryBuf.length > 1000) {
+            console.log(`>>> [API] Model ${modelId} RETRY SUCCESS`);
+            return retryBuf;
+          }
+        } catch (retryErr: any) {
+          console.error(`>>> [API] Model ${modelId} RETRY FAILED:`, retryErr.message);
+        }
+      }
+
+      continue; // try next model
+    }
+  }
+
+  throw lastError || new Error("All AI image models failed. Please try again later.");
+}
+
 export async function POST(req: NextRequest) {
   console.log(">>> [API] Hairstyle Preview Request Started");
+
   try {
+    // Auth check
     const userId = await getUserId();
-    console.log(">>> [API] Auth Check - User ID:", userId);
-    
     if (!userId) {
-      console.error(">>> [API] Auth Failed");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Please sign in to use AI Hairstyle Preview." }, { status: 401 });
     }
 
-    const body = await req.json().catch(e => {
-        console.error(">>> [API] Body Parse Error:", e);
-        return {};
-    });
-    
+    // Rate limit (30s cooldown per IP)
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const limit = rateLimit(ip, 30_000);
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: `Please wait ${limit.retryAfter || 30} seconds before trying again.` },
+        { status: 429 }
+      );
+    }
+
+    // Parse body
+    const body = await req.json().catch(() => ({}));
     const { image } = body;
     if (!image) {
-      console.error(">>> [API] No Image Provided");
-      return NextResponse.json({ error: "Image required" }, { status: 400 });
+      return NextResponse.json({ error: "No image provided. Please upload a selfie." }, { status: 400 });
     }
 
-    console.log(">>> [API] Image Received. Length:", image.length);
+    console.log(">>> [API] Image received, length:", image.length);
 
-    // Step 1: Analyze with AI Vision
-    console.log(">>> [API] Phase 1: Starting Vision Analysis...");
-    let text = "";
+    // Phase 1: Analyze hair with AI Vision
+    console.log(">>> [API] Phase 1: Vision Analysis...");
+    let analysis;
     try {
-      if (isGroqConfigured()) {
-        console.log(">>> [API] Using Groq Vision");
-        text = await groqVision({ prompt: ANALYSIS_PROMPT, image });
-      } else {
-        console.log(">>> [API] Using Gemini Vision");
-        const model = getVisionModel();
-        const base64 = image.replace(/^data:image\/\w+;base64,/, "");
-        const result = await model.generateContent([
-          ANALYSIS_PROMPT,
-          {
-            inlineData: { mimeType: "image/jpeg", data: base64 },
-          },
-        ]);
-        text = result.response.text();
-      }
-      console.log(">>> [API] Vision Response Received:", text.substring(0, 100) + "...");
+      analysis = await analyzeHairWithVision(image);
+      console.log(">>> [API] Analysis complete:", analysis.recommendedHairstyle);
     } catch (visionErr: any) {
-      console.error(">>> [API] Vision Analysis Failed:", visionErr.message);
-      throw new Error(`Vision analysis failed: ${visionErr.message}`);
+      console.error(">>> [API] Vision analysis failed:", visionErr.message);
+      // Use sensible defaults so we can still try image generation
+      analysis = {
+        hairType: "Wavy",
+        hairTexture: "Medium",
+        hairCondition: "Healthy",
+        recommendedHairstyle: "Textured Fringe",
+        confidence: 60,
+      };
+      console.log(">>> [API] Using fallback analysis");
     }
-    
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error(">>> [API] JSON Parse Error. Text was:", text);
-      throw new Error("Failed to parse analysis from AI");
-    }
-    const analysis = JSON.parse(jsonMatch[0]);
-    console.log(">>> [API] Analysis Parsed:", analysis.recommendedHairstyle);
 
-    // Step 2: Generate Edited Image (Real Hairstyle Changer)
-    const prompt = `professional hairstyle makeover, ${analysis.recommendedHairstyle}, photorealistic, high quality, 8k, preserve face and identity`;
-    
-    console.log(">>> [API] Phase 2: Starting Real AI Transformation...");
-    
+    // Phase 2: Generate transformed image
+    console.log(">>> [API] Phase 2: Image Generation...");
     let generatedImageUrl = "";
-    const { configureCloudinary } = await import("@/lib/cloudinary");
-    const cloudinary = configureCloudinary();
 
-    // Primary Strategy: Hugging Face SDXL (High Quality Image-to-Image)
     try {
-      console.log(">>> [API] Trying Strategy 1: Hugging Face SDXL (Img2Img)");
-      const hfToken = process.env.HUGGINGFACE_API_TOKEN?.trim();
-      if (!hfToken || hfToken === "hf_...") throw new Error("Hugging Face Token is missing or placeholder in .env");
+      const resultBuffer = await generateHairstyleImage(image, analysis.recommendedHairstyle);
 
-      const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
-      const buffer = Buffer.from(base64Data, "base64");
+      // Upload to Cloudinary
+      const { configureCloudinary } = await import("@/lib/cloudinary");
+      const cloudinary = configureCloudinary();
 
-      // Send as binary to Hugging Face for maximum compatibility
-      const hfRes = await fetch(
-        "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
-        {
-          headers: { 
-            Authorization: `Bearer ${hfToken}`,
-            "Content-Type": "image/jpeg",
-          },
-          method: "POST",
-          body: buffer,
-          // We pass parameters as headers for binary POSTs in some HF configurations, 
-          // but for SDXL, we'll try the standard header-based prompt first
-        }
+      const uploadRes = await cloudinary.uploader.upload(
+        `data:image/jpeg;base64,${resultBuffer.toString("base64")}`,
+        { folder: "glamora/hairstyle-previews" }
       );
 
-      if (!hfRes.ok) {
-          const errorMsg = await hfRes.text();
-          throw new Error(`HF Provider Error (${hfRes.status}): ${errorMsg}`);
-      }
-
-      const blob = await hfRes.blob();
-      const resultBuffer = Buffer.from(await blob.arrayBuffer());
-      
-      console.log(">>> [API] Strategy 1 Generation Successful. Uploading result...");
-
-      const uploadRes = await cloudinary.uploader.upload(`data:image/jpeg;base64,${resultBuffer.toString("base64")}`, {
-        folder: "glamora/hairstyle-previews",
-      });
-      
       generatedImageUrl = uploadRes.secure_url;
-      console.log(">>> [API] Strategy 1 COMPLETE:", generatedImageUrl);
-    } catch (hfErr: any) {
-      console.error(">>> [API] Strategy 1 FAILED:", hfErr.message);
-      
-      // Fallback Strategy: Pollinations (Only if SDXL fails)
-      try {
-        console.log(">>> [API] Trying Strategy 2: Pollinations (Fallback)");
-        const seed = Math.floor(Math.random() * 1000000);
-        const encodedPrompt = encodeURIComponent(`A person with a ${analysis.recommendedHairstyle} hairstyle, photorealistic, 8k`);
-        const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=768&height=768&nologo=true`;
-        
-        const uploadRes = await cloudinary.uploader.upload(pollinationsUrl, {
-          folder: "glamora/hairstyle-previews",
-        });
-        
-        generatedImageUrl = uploadRes.secure_url;
-        console.log(">>> [API] Strategy 2 COMPLETE (Note: This is a placeholder as Pollinations is not real Img2Img)");
-      } catch (pollErr: any) {
-        console.error(">>> [API] Strategy 2 FAILED:", pollErr.message);
-        throw new Error("All AI image providers are currently down or rate-limited. Please check your Hugging Face token.");
-      }
+      console.log(">>> [API] Upload complete:", generatedImageUrl);
+    } catch (imgErr: any) {
+      console.error(">>> [API] Image generation failed:", imgErr.message);
+      return NextResponse.json(
+        { error: imgErr.message || "AI image generation failed. Please try again." },
+        { status: 502 }
+      );
     }
 
-    const response: HairstylePreviewResponse = {
-      analysis: { ...analysis, confidence: analysis.confidence || 94 },
+    return NextResponse.json({
+      analysis: { ...analysis, confidence: analysis.confidence || 85 },
       generatedImageUrl,
-    };
-
-    console.log(">>> [API] Request Completed Successfully");
-    return NextResponse.json(response);
+    });
   } catch (error: any) {
-    console.error(">>> [API] CRITICAL FAILURE:", error);
+    console.error(">>> [API] CRITICAL:", error);
     return NextResponse.json(
-      { error: `API Error: ${error.message}` },
+      { error: error.message || "Something went wrong. Please try again." },
       { status: 500 }
     );
   }

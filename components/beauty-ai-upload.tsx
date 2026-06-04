@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Camera, RotateCcw } from "lucide-react";
+import { Upload, Camera, RotateCcw, AlertCircle } from "lucide-react";
 import { Button } from "./ui/button";
 import { Skeleton } from "./ui/skeleton";
 import { BeautyAICamera } from "./beauty-ai-camera";
@@ -98,6 +98,7 @@ type InputMode = "choose" | "camera" | "preview";
 
 export function BeautyAIUpload() {
   const [consent, setConsent] = useState(false);
+  const [consentChecked, setConsentChecked] = useState(false);
   const [mode, setMode] = useState<InputMode>("choose");
   const [preview, setPreview] = useState<string | null>(null);
   const [stepIndex, setStepIndex] = useState(-1);
@@ -106,10 +107,14 @@ export function BeautyAIUpload() {
     { _id: string; name: string; area: string }[]
   >([]);
   const [analyzing, setAnalyzing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   const runAnalysis = useCallback(async (base64: string) => {
     setAnalyzing(true);
     setAnalysis(null);
+    setError(null);
+    setWarning(null);
     setStepIndex(0);
     const interval = setInterval(() => {
       setStepIndex((i) => (i < STEPS.length - 1 ? i + 1 : i));
@@ -124,10 +129,13 @@ export function BeautyAIUpload() {
         body: JSON.stringify({ image: base64 }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
       setAnalysis(data.analysis);
       setMatched(data.matchedSalons || []);
-    } catch {
+      if (data.warning) setWarning(data.warning);
+    } catch (err: any) {
+      console.error("BeautyAI Error:", err);
+      setError(err.message || "Analysis failed. Please try again.");
       setAnalysis(null);
     } finally {
       clearInterval(interval);
@@ -158,6 +166,8 @@ export function BeautyAIUpload() {
     setAnalysis(null);
     setMatched([]);
     setStepIndex(-1);
+    setError(null);
+    setWarning(null);
     setMode("choose");
   }
 
@@ -174,8 +184,8 @@ export function BeautyAIUpload() {
               type="checkbox" 
               id="privacy" 
               className="h-4 w-4 rounded border-white/20 bg-white/5 text-violet-500 focus:ring-violet-500" 
-              checked={consent}
-              onChange={(e) => setConsent(e.target.checked)}
+              checked={consentChecked}
+              onChange={(e) => setConsentChecked(e.target.checked)}
             />
             <label htmlFor="privacy" className="text-sm text-cream cursor-pointer">
               I agree to the processing of my facial data
@@ -183,7 +193,7 @@ export function BeautyAIUpload() {
           </div>
           <Button 
             className="mt-6" 
-            disabled={!consent}
+            disabled={!consentChecked}
             onClick={() => setConsent(true)}
           >
             Enter Facial Analysis
@@ -217,7 +227,7 @@ export function BeautyAIUpload() {
             onClick={() => setMode("camera")}
             className="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border-2 border-cyan-400/30 bg-[#1A1C29]/50 p-8 backdrop-blur transition-all hover:scale-[1.01] hover:border-cyan-400/50 hover:shadow-ai-glow-sm"
           >
-            <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-violet-500/40/50 bg-gold/10">
+            <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-violet-500/40 bg-gold/10">
               <Camera className="h-8 w-8 text-gold" />
             </span>
             <p className="font-display text-lg text-cream">Live camera</p>
@@ -294,6 +304,33 @@ export function BeautyAIUpload() {
         </div>
       )}
 
+      {/* Error State */}
+      {error && !analyzing && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col items-center justify-center rounded-2xl border border-rose-500/30 bg-rose-500/5 py-8 text-center"
+        >
+          <AlertCircle className="mb-3 h-10 w-10 text-rose-400" />
+          <p className="text-sm font-medium text-rose-300">{error}</p>
+          <Button variant="outline" size="sm" className="mt-4 border-rose-500/30 hover:bg-rose-500/10" onClick={reset}>
+            Try Again
+          </Button>
+        </motion.div>
+      )}
+
+      {/* Warning Banner */}
+      {warning && analysis && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-amber-300"
+        >
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {warning}
+        </motion.div>
+      )}
+
       {analyzing && !analysis && (
         <div className="grid gap-4 sm:grid-cols-2">
           {[1, 2, 3, 4].map((i) => (
@@ -309,30 +346,6 @@ export function BeautyAIUpload() {
             animate={{ opacity: 1, y: 0 }}
             className="space-y-4"
           >
-            <div className="glass-card p-6 border-cyan-400/20">
-              <h3 className="mb-6 text-xs font-bold uppercase tracking-widest text-cyan-400">AI Analysis Preview</h3>
-              <div className="grid gap-6 sm:grid-cols-2">
-                <div className="space-y-3">
-                  <p className="text-center text-[10px] font-bold uppercase tracking-widest text-cream-muted">Baseline</p>
-                  <div className="relative aspect-square overflow-hidden rounded-2xl border border-white/10">
-                    <Image src={preview!} alt="Current" fill className="object-cover" unoptimized />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <p className="text-center text-[10px] font-bold uppercase tracking-widest text-gold">Target Enhancement</p>
-                  <div className="relative aspect-square overflow-hidden rounded-2xl border border-gold/30 shadow-gold-glow-sm">
-                    <Image src={preview!} alt="Recommended" fill className="object-cover contrast-110 saturate-110" unoptimized />
-                    <div className="absolute inset-0 bg-violet-500/5 mix-blend-overlay" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-gold/20 to-transparent" />
-                  </div>
-                </div>
-              </div>
-              <p className="mt-6 text-center text-xs text-cream-muted italic">
-                {'"'}AI visualization of facial architecture analysis and recommended skin profile enhancements{'"'}
-              </p>
-            </div>
-
             <div className="grid gap-4 sm:grid-cols-2">
               {/* Beauty Profile Score Card */}
               <ResultCard title="Overall Facial Score" className="sm:col-span-2 border-violet-500/30 bg-violet-500/5">
@@ -394,24 +407,26 @@ export function BeautyAIUpload() {
                 </ul>
               </ResultCard>
               
-              <ResultCard title="Recommended Skincare Studios" className="sm:col-span-2">
-                <div className="grid gap-4 sm:grid-cols-2 mt-1">
-                  {matched.map((s) => (
-                    <div
-                      key={s._id}
-                      className="flex items-center justify-between group p-3 rounded-xl border border-white/5 bg-white/5"
-                    >
-                      <div className="space-y-0.5">
-                        <span className="text-sm font-medium text-cream group-hover:text-gold transition-colors">{s.name}</span>
-                        <p className="text-[10px] text-cream-muted uppercase tracking-widest">{s.area}</p>
+              {matched.length > 0 && (
+                <ResultCard title="Recommended Skincare Studios" className="sm:col-span-2">
+                  <div className="grid gap-4 sm:grid-cols-2 mt-1">
+                    {matched.map((s) => (
+                      <div
+                        key={s._id}
+                        className="flex items-center justify-between group p-3 rounded-xl border border-white/5 bg-white/5"
+                      >
+                        <div className="space-y-0.5">
+                          <span className="text-sm font-medium text-cream group-hover:text-gold transition-colors">{s.name}</span>
+                          <p className="text-[10px] text-cream-muted uppercase tracking-widest">{s.area}</p>
+                        </div>
+                        <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold uppercase tracking-wider" asChild>
+                          <Link href={`/book/${s._id}`}>Book</Link>
+                        </Button>
                       </div>
-                      <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold uppercase tracking-wider" asChild>
-                        <Link href={`/book/${s._id}`}>Book</Link>
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </ResultCard>
+                    ))}
+                  </div>
+                </ResultCard>
+              )}
             </div>
           </motion.div>
         )}
