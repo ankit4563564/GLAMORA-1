@@ -13,16 +13,25 @@ export async function GET(req: Request) {
     const force = searchParams.get("force") === "1";
     const secret = searchParams.get("secret");
 
-    // Basic hackathon protection: check for a secret key
-    if (process.env.SEED_SECRET && secret !== process.env.SEED_SECRET) {
+    // Strictly require secret for any operation that can wipe data
+    if (!process.env.SEED_SECRET || secret !== process.env.SEED_SECRET) {
+      console.warn("[SEED] Unauthorized attempt to access seed endpoint");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectDB();
     const count = await Salon.countDocuments();
+    
+    // Safety check: if already seeded and not forced, do nothing
     if (count >= 10 && !force) {
       return NextResponse.json({ message: "Already seeded", count });
     }
+
+    // In production, we should be extremely careful with deleteMany
+    if (process.env.NODE_ENV === "production" && !force) {
+       return NextResponse.json({ error: "Cannot re-seed in production without force flag" }, { status: 403 });
+    }
+
     await Salon.deleteMany({});
     await Salon.insertMany(SEED_SALONS);
     invalidateSalonCache();

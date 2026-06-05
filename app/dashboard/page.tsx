@@ -50,6 +50,16 @@ export default function DashboardPage() {
   const [channel, setChannel] = useState("Instagram Caption");
   const [copies, setCopies] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [realBookings, setRealBookings] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (isLoaded && role === "owner") {
+      fetch("/api/bookings")
+        .then(r => r.json())
+        .then(d => setRealBookings(d.bookings || []))
+        .catch(() => {});
+    }
+  }, [isLoaded, role]);
 
   if (isLoaded && role !== "owner" && !isDemo) {
     return (
@@ -139,14 +149,14 @@ export default function DashboardPage() {
                 </div>
                 <div className="rounded-2xl glass-card p-4">
                   <p className="mb-3 text-sm text-gold">Recent Bookings</p>
-                  {["GM-482910", "GM-391204", "GM-772103"].map((id) => (
+                  {(realBookings.length > 0 ? realBookings.slice(0, 5) : [{ bookingId: "GM-482910" }, { bookingId: "GM-391204" }]).map((b) => (
                     <div
-                      key={id}
+                      key={b.bookingId}
                       className="mb-2 flex justify-between border-b border-border pb-2 text-sm"
                     >
-                      <span className="font-mono text-cream-muted">{id}</span>
+                      <span className="font-mono text-cream-muted">{b.bookingId}</span>
                       <span className="rounded-full bg-success/20 px-2 text-xs text-success">
-                        confirmed
+                        {b.status || "confirmed"}
                       </span>
                     </div>
                   ))}

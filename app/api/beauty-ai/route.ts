@@ -11,7 +11,7 @@ const PROMPT = `You are a professional esthetician and facial analyst AI. Analyz
 { 
   "faceShape": { "shape": string, "confidence": number, "description": string, "recommendedFacialFeatures": string[] }, 
   "skinTone": { "undertone": string, "confidence": number, "complexion": string, "treatments": string[] }, 
-  "beautyProfileScore": number 
+  "styleCompatibilityScore": number 
 }`;
 
 export async function POST(req: NextRequest) {
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       complexion: "Clear with even tone",
       treatments: ["Hydration therapy", "SPF protection", "Vitamin C serum"],
     },
-    beautyProfileScore: 88,
+    styleCompatibilityScore: 88,
   };
   let analysisError: string | null = null;
 

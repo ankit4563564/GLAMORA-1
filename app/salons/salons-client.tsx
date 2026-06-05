@@ -55,12 +55,11 @@ export default function SalonsPageClient() {
           (err) => {
             console.error("Location error:", err);
             setSort("relevance");
-            alert("Please enable location access for distance sorting.");
+            // Non-blocking error logging
           }
         );
       } else {
         setSort("relevance");
-        alert("Geolocation is not supported by your browser.");
       }
     }
   }, [sort, userLocation]);

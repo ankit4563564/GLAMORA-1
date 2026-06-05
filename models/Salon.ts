@@ -47,4 +47,10 @@ const SalonSchema = new Schema(
   { timestamps: true }
 );
 
+// Indexes for high-performance searching and filtering
+SalonSchema.index({ area: 1 });
+SalonSchema.index({ rating: -1 });
+SalonSchema.index({ specialty: 1 });
+SalonSchema.index({ name: "text", description: "text", tags: "text" });
+
 export const Salon = models.Salon || model("Salon", SalonSchema);

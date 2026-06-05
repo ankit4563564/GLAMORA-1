@@ -4,8 +4,21 @@ import { connectDB } from "@/lib/mongodb";
 import { Booking } from "@/models/Booking";
 import { Salon } from "@/models/Salon";
 import { generateBookingId } from "@/lib/utils";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
+
+const BookingSchema = z.object({
+  salonId: z.string(),
+  salonName: z.string().optional(),
+  service: z.object({
+    name: z.string(),
+    price: z.number(),
+    duration: z.number(),
+  }),
+  date: z.string(),
+  timeSlot: z.string(),
+});
 
 export async function GET() {
   const userId = await getUserId();
@@ -30,7 +43,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   
-  const body = await req.json();
+  const rawBody = await req.json().catch(() => ({}));
+  const validation = BookingSchema.safeParse(rawBody);
+  
+  if (!validation.success) {
+    return NextResponse.json({ error: "Invalid booking data", details: validation.error.format() }, { status: 400 });
+  }
+
+  const body = validation.data;
   const bookingId = generateBookingId();
   
   try {
@@ -42,6 +62,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Salon not found" }, { status: 404 });
     }
     
+    // Slot locking check
+    const existingBooking = await Booking.findOne({
+      salonId: body.salonId,
+      date: new Date(body.date),
+      timeSlot: body.timeSlot,
+      status: "confirmed"
+    });
+
+    if (existingBooking) {
+      return NextResponse.json({ error: "This slot was just taken. Please choose another time." }, { status: 409 });
+    }
+
     const realService = (salon.services as any[]).find((s: any) => s.name === body.service.name);
     if (!realService) {
       return NextResponse.json({ error: "Service not found" }, { status: 400 });
@@ -67,22 +99,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ booking, bookingId });
   } catch (err) {
     console.error("Booking error:", err);
-    // Demo fallback if DB fails
-    const fallbackDoc = {
-      userId,
-      salonId: body.salonId,
-      salonName: body.salonName || "Demo Salon",
-      service: body.service,
-      date: new Date(body.date),
-      timeSlot: body.timeSlot,
-      status: "confirmed" as const,
-      bookingId,
-      paymentMode: "pay_at_salon",
-    };
-    return NextResponse.json({
-      booking: { ...fallbackDoc, _id: "demo" },
-      bookingId,
-      isDemo: true
-    });
+    return NextResponse.json({ error: "Appointment confirmation failed. Please try again." }, { status: 500 });
   }
 }

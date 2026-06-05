@@ -37,9 +37,14 @@ function toSalonCard(s: SalonDoc, query: string) {
   if (q.includes('skin') || q.includes('facial')) reasons.push("Advanced dermal therapy");
   if (q.includes('spa') || q.includes('massage')) reasons.push("Premium relaxation lounge");
 
-  // Deterministic but "AI-looking" score
-  const scoreBase = 85 + (s.rating * 2);
-  const matchScore = Math.min(99, Math.floor(scoreBase + (Math.random() * 5)));
+  // Deterministic score based on rating and category match
+  let categoryBonus = 0;
+  if (q.includes(s.specialty.toLowerCase())) categoryBonus = 3;
+  
+  const scoreBase = 88 + (s.rating * 1.5) + categoryBonus;
+  // Use a small deterministic offset based on ID to avoid all 99s
+  const idOffset = (parseInt(String(s._id).slice(-2), 16) || 0) % 5;
+  const matchScore = Math.min(99, Math.floor(scoreBase + idOffset));
 
   return {
     _id: s._id,

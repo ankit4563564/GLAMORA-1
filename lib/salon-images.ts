@@ -24,7 +24,8 @@ export const DEFAULT_SALON_IMAGE = unsplashUrl(GALLERY[0]);
 
 export function unsplashUrl(photoId: string): string {
   const id = photoId.startsWith("photo-") ? photoId : `photo-${photoId}`;
-  return `https://images.unsplash.com/${id}?auto=format&fit=crop&w=800&q=80`;
+  // fm=webp for Next.js-friendly format, q=75 for production balance, w=800 for optimal card sizing
+  return `https://images.unsplash.com/${id}?auto=format&fit=crop&w=800&q=75&fm=webp`;
 }
 
 export function resolveSalonImage(

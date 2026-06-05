@@ -28,7 +28,7 @@ type Analysis = {
     complexion: string;
     treatments: string[];
   };
-  beautyProfileScore?: number;
+  styleCompatibilityScore?: number;
 };
 
 function AnalysisOverlay() {
@@ -348,11 +348,11 @@ export function BeautyAIUpload() {
           >
             <div className="grid gap-4 sm:grid-cols-2">
               {/* Beauty Profile Score Card */}
-              <ResultCard title="Overall Facial Score" className="sm:col-span-2 border-violet-500/30 bg-violet-500/5">
+              <ResultCard title="Overall Style Compatibility" className="sm:col-span-2 border-violet-500/30 bg-violet-500/5">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <p className="font-display text-4xl text-metallic">
-                      {analysis.beautyProfileScore || 92}<span className="text-xl text-violet-400">/100</span>
+                      {analysis.styleCompatibilityScore || 92}<span className="text-xl text-violet-400">/100</span>
                     </p>
                     <p className="text-xs font-bold text-success uppercase tracking-widest">
                       High Confidence Analysis
@@ -360,7 +360,7 @@ export function BeautyAIUpload() {
                   </div>
                   <div className="h-16 w-16 rounded-full border-4 border-violet-500/20 flex items-center justify-center relative">
                     <div className="absolute inset-0 rounded-full border-4 border-violet-500 border-t-transparent animate-spin-slow" />
-                    <span className="text-lg font-bold text-violet-300">{analysis.beautyProfileScore || 92}%</span>
+                    <span className="text-lg font-bold text-violet-300">{analysis.styleCompatibilityScore || 92}%</span>
                   </div>
                 </div>
               </ResultCard>
