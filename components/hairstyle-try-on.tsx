@@ -9,10 +9,9 @@ import { BeforeAfterSlider } from "./before-after-slider";
 import { HairstylePreviewResponse } from "@/lib/hairstyle-types";
 
 const LOADING_STEPS = [
-  "Analyzing face geometry...",
-  "Choosing perfect style...",
-  "Generating AI preview...",
-  "Rendering transformation...",
+  "Analyzing your hair type & texture...",
+  "Choosing the perfect style for you...",
+  "Generating AI hairstyle preview...",
 ];
 
 async function compressImage(base64: string): Promise<string> {
@@ -224,7 +223,7 @@ export function HairstyleTryOn() {
               ))}
             </div>
             <p className="mt-2 text-xs text-cream-muted">
-              This may take 15–45 seconds depending on AI provider load
+              Powered by FLUX AI — usually ready in 5–10 seconds
             </p>
           </div>
         </div>
@@ -270,7 +269,7 @@ export function HairstyleTryOn() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-amber-300"
+          className="flex items-center gap-3 rounded-2xl border border-blue-500/30 bg-blue-500/5 px-4 py-3 text-xs text-blue-300"
         >
           <AlertCircle className="h-4 w-4 shrink-0" />
           {warning}

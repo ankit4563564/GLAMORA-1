@@ -39,7 +39,7 @@ export function BeforeAfterSlider({
         setIsLoading(false);
         setHasError(true);
       }
-    }, 45000); // 45 seconds timeout
+    }, 90000); // 90 seconds — Pollinations.ai FLUX generation can take up to 60s
     
     return () => clearTimeout(timer);
   }, [isLoading]);
@@ -119,8 +119,8 @@ export function BeforeAfterSlider({
                 <div className="absolute inset-2 animate-spin-slow rounded-full border-2 border-cyan-400/20 border-t-cyan-400" />
              </div>
              <div className="text-center space-y-1">
-                <p className="text-xs font-bold uppercase tracking-widest text-white">Generating AI Look</p>
-                <p className="text-[10px] text-cream-muted">Wait for transformation (30-45s)...</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-white">Generating with FLUX AI</p>
+                <p className="text-[10px] text-cream-muted">Free AI rendering in progress (10–60s)...</p>
              </div>
           </div>
         </div>
