@@ -1,7 +1,7 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   LineChart,
   Line,
