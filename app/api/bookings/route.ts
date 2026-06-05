@@ -7,6 +7,7 @@ import { generateBookingId } from "@/lib/utils";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 20;
 
 const BookingSchema = z.object({
   salonId: z.string(),
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
       date: new Date(body.date),
       timeSlot: body.timeSlot,
       status: "confirmed"
-    });
+    }).maxTimeMS(5000); // 5s query limit
 
     if (existingBooking) {
       return NextResponse.json({ error: "This slot was just taken. Please choose another time." }, { status: 409 });
@@ -97,8 +98,11 @@ export async function POST(req: NextRequest) {
 
     const booking = await Booking.create(doc);
     return NextResponse.json({ booking, bookingId });
-  } catch (err) {
+  } catch (err: any) {
     console.error("Booking error:", err);
+    if (err.code === 11000) {
+      return NextResponse.json({ error: "This slot was just taken. Please choose another time." }, { status: 409 });
+    }
     return NextResponse.json({ error: "Appointment confirmation failed. Please try again." }, { status: 500 });
   }
 }

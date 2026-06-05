@@ -34,25 +34,38 @@ export function BookingFlow({
   async function confirm() {
     if (!service || !dateKey || !timeSlot) return;
     setLoading(true);
-    const res = await fetch("/api/bookings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        salonId: salon._id,
-        salonName: salon.name,
-        service: {
-          name: service.name,
-          price: service.price,
-          duration: service.duration,
-        },
-        date: dateKey,
-        timeSlot,
-      }),
-    });
-    const data = await res.json();
-    setBookingId(data.bookingId || "GM-DEMO");
-    setStep(4);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          salonId: salon._id,
+          salonName: salon.name,
+          service: {
+            name: service.name,
+            price: service.price,
+            duration: service.duration,
+          },
+          date: dateKey,
+          timeSlot,
+        }),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        alert(data.error || "Booking failed. The slot might have been taken.");
+        return;
+      }
+
+      setBookingId(data.bookingId || "GM-DEMO");
+      setStep(4);
+    } catch (e) {
+      console.error("Booking Confirm Error:", e);
+      alert("Something went wrong. Please check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   function downloadIcs() {
