@@ -186,7 +186,25 @@ export default function SalonsPageClient() {
                   ? Array.from({ length: 6 }).map((_, i) => (
                       <Skeleton key={i} className="aspect-[3/4] w-full rounded-2xl" />
                     ))
-                  : filtered.map((s, i) => <SalonCard key={s._id} salon={s} index={i} />)}
+                  : filtered.length > 0 
+                    ? filtered.map((s, i) => <SalonCard key={s._id} salon={s} index={i} />)
+                    : (
+                      <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
+                        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/5 border border-white/10">
+                          <MapIcon className="h-8 w-8 text-cream-muted" />
+                        </div>
+                        <h3 className="font-display text-xl text-cream">No matching enclaves</h3>
+                        <p className="mt-2 text-sm text-cream-muted">Try adjusting your filters or searching a different area.</p>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="mt-6"
+                          onClick={() => setFilters(defaultFilters)}
+                        >
+                          Clear all filters
+                        </Button>
+                      </div>
+                    )}
               </motion.div>
             ) : (
               <div className="h-[min(650px,calc(100vh-250px))] min-h-[400px] w-full sticky top-24">
