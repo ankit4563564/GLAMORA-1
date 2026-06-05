@@ -88,7 +88,7 @@ export function SalonCard({
     <motion.article
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
+      transition={{ delay: index * 0.02 }}
       whileHover={{ y: -4 }}
       className="group relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#1A1C29]/40 backdrop-blur-md transition-all hover:border-violet-500/30 hover:bg-[#1A1C29]/60"
     >

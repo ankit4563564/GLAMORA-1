@@ -42,9 +42,21 @@ export async function getSalons(filters?: {
     await connectDB();
     await ensureSalonsSeeded();
 
-    const query: Record<string, unknown> = {};
+    const query: Record<string, any> = {};
     if (filters?.area) query.area = new RegExp(filters.area, "i");
     if (filters?.minRating) query.rating = { $gte: filters.minRating };
+    
+    if ((filters?.category && filters.category !== "All") || filters?.maxPrice) {
+      const serviceQuery: Record<string, any> = {};
+      if (filters?.category && filters.category !== "All") {
+        serviceQuery.category = { $regex: new RegExp(`^${filters.category}$`, "i") };
+      }
+      if (filters?.maxPrice) {
+        serviceQuery.price = { $lte: filters.maxPrice };
+      }
+      query.services = { $elemMatch: serviceQuery };
+    }
+
     if (filters?.search) {
       const term = filters.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const re = new RegExp(term, "i");
@@ -58,28 +70,11 @@ export async function getSalons(filters?: {
       ];
     }
 
-    let salons = await Salon.find(query)
+    const salons = await Salon.find(query)
       .select(
         "name area city rating reviewCount specialty description services images openHours availableSlots priceRange tags sentimentSummary ownerName ownerEmail coordinates"
       )
       .lean();
-
-    if (filters?.category && filters.category !== "All") {
-      salons = salons.filter((s) =>
-        s.services?.some(
-          (svc: { category: string }) =>
-            svc.category.toLowerCase() === filters.category!.toLowerCase() ||
-            (filters.category === "Men's" && svc.category === "Men's")
-        )
-      );
-    }
-    if (filters?.maxPrice) {
-      salons = salons.filter((s) =>
-        s.services?.some(
-          (svc: { price: number }) => svc.price <= filters.maxPrice!
-        )
-      );
-    }
 
     if (salons.length > 0) {
       return mapSalons(salons as Array<Record<string, unknown> & { _id: unknown }>);

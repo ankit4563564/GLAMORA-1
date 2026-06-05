@@ -30,9 +30,9 @@ const SERVICE_CHIPS = ["Haircut", "Hair Color", "Facial", "Bridal Makeup", "Mass
 type SortKey = "relevance" | "rating" | "popularity" | "distance" | "price";
 type ViewMode = "grid" | "map";
 
-export default function SalonsPageClient() {
-  const [salons, setSalons] = useState<SalonCardData[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function SalonsPageClient({ initialSalons = [] }: { initialSalons?: SalonCardData[] }) {
+  const [salons, setSalons] = useState<SalonCardData[]>(initialSalons);
+  const [loading, setLoading] = useState(initialSalons.length === 0);
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [sort, setSort] = useState<SortKey>("relevance");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -40,6 +40,8 @@ export default function SalonsPageClient() {
   const [activeService, setActiveService] = useState<string | null>(null);
 
   useEffect(() => {
+    if (initialSalons.length > 0) return;
+
     fetch("/api/salons")
       .then((r) => r.json())
       .then((d) => {
@@ -53,7 +55,7 @@ export default function SalonsPageClient() {
         setSalons(enhanced);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [initialSalons]);
 
   useEffect(() => {
     if (sort === "distance" && !userLocation) {
