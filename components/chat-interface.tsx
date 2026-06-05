@@ -80,12 +80,23 @@ export function ChatInterface() {
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lastMessageRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
 
   useEffect(() => {
-    if (scrollRef.current) {
+    if (lastMessageRef.current) {
+      // If it's a long message with salons, scroll to the start of it
+      // so the user reads the advice first. Otherwise scroll to bottom.
+      const lastMsg = messages[messages.length - 1];
+      const hasSalons = lastMsg?.role === "assistant" && lastMsg.salons && lastMsg.salons.length > 0;
+      
+      lastMessageRef.current.scrollIntoView({ 
+        behavior: "smooth", 
+        block: hasSalons ? "start" : "nearest" 
+      });
+    } else if (scrollRef.current) {
       scrollRef.current.scrollTo({
         top: scrollRef.current.scrollHeight,
         behavior: "smooth",
@@ -212,9 +223,10 @@ export function ChatInterface() {
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4"
           >
             <div className="space-y-4">
-              {messages.map((m) => (
+              {messages.map((m, idx) => (
                 <div
                   key={m.id}
+                  ref={idx === messages.length - 1 ? lastMessageRef : null}
                   className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
