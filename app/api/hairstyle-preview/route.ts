@@ -219,6 +219,8 @@ export async function POST(req: NextRequest) {
     // Phase 2: Generate transformed image
     console.log(">>> [API] Phase 2: Image Generation...");
     let generatedImageUrl = "";
+    let isDemoMode = false;
+    let warningMessage = "";
 
     try {
       const resultBuffer = await generateHairstyleImage(image, analysis.recommendedHairstyle);
@@ -236,15 +238,56 @@ export async function POST(req: NextRequest) {
       console.log(">>> [API] Upload complete:", generatedImageUrl);
     } catch (imgErr: any) {
       console.error(">>> [API] Image generation failed:", imgErr.message);
-      return NextResponse.json(
-        { error: imgErr.message || "AI image generation failed. Please try again." },
-        { status: 502 }
-      );
+      
+      const errMsg = (imgErr.message || "").toLowerCase();
+      const isAuthError =
+        errMsg.includes("api_token") ||
+        errMsg.includes("invalid") ||
+        errMsg.includes("expired") ||
+        errMsg.includes("username") ||
+        errMsg.includes("password") ||
+        errMsg.includes("auth") ||
+        errMsg.includes("unauthorized") ||
+        errMsg.includes("401") ||
+        errMsg.includes("credential") ||
+        errMsg.includes("inference provider mapping");
+
+      if (isAuthError) {
+        // Map recommended hairstyle to a nice Unsplash preview
+        const style = (analysis.recommendedHairstyle || "").toLowerCase();
+        let fallbackUrl = "https://images.unsplash.com/photo-1562322140-8baeececf3df?w=800&auto=format&fit=crop&q=80"; // Default
+        
+        if (style.includes("fringe") || style.includes("textured")) {
+          fallbackUrl = "https://images.unsplash.com/photo-1595642527925-4d41cb781653?w=800&auto=format&fit=crop&q=80";
+        } else if (style.includes("pixie") || style.includes("short")) {
+          fallbackUrl = "https://images.unsplash.com/photo-1605497746445-97d1b0a9ead9?w=800&auto=format&fit=crop&q=80";
+        } else if (style.includes("layers") || style.includes("long")) {
+          fallbackUrl = "https://images.unsplash.com/photo-1562322140-8baeececf3df?w=800&auto=format&fit=crop&q=80";
+        } else if (style.includes("bob") || style.includes("cut")) {
+          fallbackUrl = "https://images.unsplash.com/photo-1616683693504-3ea7e9ad6fec?w=800&auto=format&fit=crop&q=80";
+        } else if (style.includes("fade") || style.includes("undercut")) {
+          fallbackUrl = "https://images.unsplash.com/photo-1621605815971-fbc98d665033?w=800&auto=format&fit=crop&q=80";
+        } else if (style.includes("buzz") || style.includes("crop")) {
+          fallbackUrl = "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=800&auto=format&fit=crop&q=80";
+        }
+
+        generatedImageUrl = fallbackUrl;
+        isDemoMode = true;
+        warningMessage = "Demo Mode: Hugging Face API token is invalid or expired. Displaying a high-quality sample hairstyle preview.";
+        console.log(">>> [API] Fallback to demo mode sample image:", fallbackUrl);
+      } else {
+        return NextResponse.json(
+          { error: imgErr.message || "AI image generation failed. Please try again." },
+          { status: 502 }
+        );
+      }
     }
 
     return NextResponse.json({
       analysis: { ...analysis, confidence: analysis.confidence || 85 },
       generatedImageUrl,
+      isDemoMode,
+      warning: warningMessage,
     });
   } catch (error: any) {
     console.error(">>> [API] CRITICAL:", error);

@@ -52,6 +52,7 @@ export function HairstyleTryOn() {
   const [loading, setLoading] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -102,6 +103,11 @@ export function HairstyleTryOn() {
       }
       
       setPreviewData(data);
+      if (data.warning) {
+        setWarning(data.warning);
+      } else {
+        setWarning(null);
+      }
       setRetryCount(0);
     } catch (err: any) {
       console.error("AI Preview Error:", err);
@@ -151,6 +157,7 @@ export function HairstyleTryOn() {
     setOriginalImage(null);
     setPreviewData(null);
     setError(null);
+    setWarning(null);
     setLoading(false);
     setStepIndex(0);
     setRetryCount(0);
@@ -255,6 +262,18 @@ export function HairstyleTryOn() {
               Upload New Photo
             </Button>
           </div>
+        </motion.div>
+      )}
+
+      {/* Warning Banner */}
+      {warning && previewData && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-amber-300"
+        >
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {warning}
         </motion.div>
       )}
 

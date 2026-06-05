@@ -9,4 +9,6 @@ export type HairstyleAnalysis = {
 export type HairstylePreviewResponse = {
   analysis: HairstyleAnalysis;
   generatedImageUrl: string;
+  warning?: string;
+  isDemoMode?: boolean;
 };
