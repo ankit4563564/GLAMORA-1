@@ -91,7 +91,7 @@ export function BeforeAfterSlider({
       <div 
         className="absolute inset-0 z-10 pointer-events-none"
         style={{ 
-          clipPath: `inset(0 ${100 - sliderPosition}% 0 0)`,
+          clipPath: `inset(0 0 0 ${sliderPosition}%)`,
           opacity: hasError ? 0 : 1 
         }}
       >
