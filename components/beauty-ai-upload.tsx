@@ -1,13 +1,28 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Camera, RotateCcw, AlertCircle } from "lucide-react";
+import { 
+  Upload, 
+  Camera, 
+  RotateCcw, 
+  AlertCircle, 
+  Sparkles, 
+  Heart, 
+  Share2, 
+  Check, 
+  ArrowRight,
+  User,
+  Zap
+} from "lucide-react";
 import { Button } from "./ui/button";
 import { Skeleton } from "./ui/skeleton";
 import { BeautyAICamera } from "./beauty-ai-camera";
+import { useToast } from "./ui/toast";
+import { ComparisonSlider } from "./beauty-ai-comparison";
+import { HAIRSTYLES, hairstyleImageUrl } from "@/lib/hairstyles";
 
 const STEPS = [
   "Analyzing facial geometry…",
@@ -34,93 +49,61 @@ type Analysis = {
 function AnalysisOverlay() {
   return (
     <div className="absolute inset-0 z-10 overflow-hidden rounded-full">
-      {/* Scanning Line */}
       <motion.div 
         className="absolute left-0 right-0 h-1 bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)] z-20"
         initial={{ top: "-10%" }}
         animate={{ top: "110%" }}
         transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
       />
-      
-      {/* Face Landmarks (SVG) */}
       <svg className="absolute inset-0 h-full w-full opacity-60" viewBox="0 0 100 100">
-        <motion.path 
-          d="M30,40 Q50,35 70,40" 
-          stroke="#22d3ee" strokeWidth="0.5" fill="none"
-          initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ delay: 0.5, duration: 1 }}
-        />
-        <motion.circle 
-          cx="35" cy="45" r="2" stroke="#22d3ee" strokeWidth="0.5" fill="none"
-          initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 1, duration: 0.5 }}
-        />
-        <motion.circle 
-          cx="65" cy="45" r="2" stroke="#22d3ee" strokeWidth="0.5" fill="none"
-          initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 1.2, duration: 0.5 }}
-        />
-        <motion.path 
-          d="M50,50 L50,65 L45,70 L55,70 L50,65" 
-          stroke="#22d3ee" strokeWidth="0.5" fill="none"
-          initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ delay: 1.5, duration: 1 }}
-        />
-        <motion.path 
-          d="M40,80 Q50,85 60,80" 
-          stroke="#22d3ee" strokeWidth="0.5" fill="none"
-          initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ delay: 2, duration: 1 }}
-        />
-        {/* Jawline Outline */}
-        <motion.path 
-          d="M25,50 Q25,85 50,95 Q75,85 75,50" 
-          stroke="#8b5cf6" strokeWidth="1" fill="none" strokeDasharray="2 2"
-          initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ delay: 2.5, duration: 1.5 }}
-        />
+        <motion.path d="M30,40 Q50,35 70,40" stroke="#22d3ee" strokeWidth="0.5" fill="none" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} />
+        <motion.circle cx="35" cy="45" r="2" stroke="#22d3ee" strokeWidth="0.5" fill="none" />
+        <motion.circle cx="65" cy="45" r="2" stroke="#22d3ee" strokeWidth="0.5" fill="none" />
+        <motion.path d="M25,50 Q25,85 50,95 Q75,85 75,50" stroke="#8b5cf6" strokeWidth="1" fill="none" strokeDasharray="2 2" />
       </svg>
-
-      {/* Logic Badges */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1 }}
-          className="bg-black/60 backdrop-blur-md border border-cyan-400/30 px-2 py-0.5 rounded text-[8px] uppercase tracking-tighter text-cyan-300 mb-20 ml-20"
-        >
-          Symmetry: 98.2%
-        </motion.div>
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 2.5 }}
-          className="bg-black/60 backdrop-blur-md border border-violet-400/30 px-2 py-0.5 rounded text-[8px] uppercase tracking-tighter text-violet-300 mt-28 mr-20"
-        >
-          Jawline: Defined
-        </motion.div>
-      </div>
     </div>
   );
 }
 
-type InputMode = "choose" | "camera" | "preview";
-
 export function BeautyAIUpload() {
+  const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
   const [consent, setConsent] = useState(false);
   const [consentChecked, setConsentChecked] = useState(false);
-  const [mode, setMode] = useState<InputMode>("choose");
+  const [mode, setMode] = useState<"choose" | "camera" | "preview">("choose");
   const [preview, setPreview] = useState<string | null>(null);
   const [stepIndex, setStepIndex] = useState(-1);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
-  const [matched, setMatched] = useState<
-    { _id: string; name: string; area: string }[]
-  >([]);
+  const [matched, setMatched] = useState<{ _id: string; name: string; area: string }[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [warning, setWarning] = useState<string | null>(null);
+  const [savedStyles, setSavedStyles] = useState<string[]>([]);
+
+  useEffect(() => {
+    const saved = JSON.parse(localStorage.getItem("glamora-saved-styles") || "[]");
+    setSavedStyles(saved);
+  }, []);
+
+  const saveStyle = (styleId: string) => {
+    const newSaved = [...savedStyles, styleId];
+    setSavedStyles(newSaved);
+    localStorage.setItem("glamora-saved-styles", JSON.stringify(newSaved));
+    toastSuccess("Style saved to your profile!");
+  };
+
+  const shareResult = () => {
+    const text = `I just got my style analysis from Glamora! My style confidence score is ${analysis?.styleCompatibilityScore || 92}%. Check it out!`;
+    navigator.clipboard.writeText(text);
+    toastInfo("Summary copied to clipboard!");
+  };
 
   const runAnalysis = useCallback(async (base64: string) => {
     setAnalyzing(true);
     setAnalysis(null);
     setError(null);
-    setWarning(null);
     setStepIndex(0);
     const interval = setInterval(() => {
       setStepIndex((i) => (i < STEPS.length - 1 ? i + 1 : i));
     }, 850);
-
-    await new Promise((r) => setTimeout(r, 2500));
 
     try {
       const res = await fetch("/api/beauty-ai", {
@@ -129,14 +112,11 @@ export function BeautyAIUpload() {
         body: JSON.stringify({ image: base64 }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      if (!res.ok) throw new Error(data.error || `Request failed`);
       setAnalysis(data.analysis);
       setMatched(data.matchedSalons || []);
-      if (data.warning) setWarning(data.warning);
     } catch (err: any) {
-      console.error("BeautyAI Error:", err);
-      setError(err.message || "Analysis failed. Please try again.");
-      setAnalysis(null);
+      setError(err.message || "Analysis failed.");
     } finally {
       clearInterval(interval);
       setStepIndex(-1);
@@ -151,23 +131,12 @@ export function BeautyAIUpload() {
     runAnalysis(dataUrl);
   }
 
-  function onFile(file: File) {
-    if (!consent) {
-      alert("Please accept the privacy consent first.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => startWithImage(reader.result as string);
-    reader.readAsDataURL(file);
-  }
-
   function reset() {
     setPreview(null);
     setAnalysis(null);
     setMatched([]);
     setStepIndex(-1);
     setError(null);
-    setWarning(null);
     setMode("choose");
   }
 
@@ -177,281 +146,188 @@ export function BeautyAIUpload() {
         <div className="glass-card p-6 text-center border-violet-500/30 bg-violet-500/5">
           <h2 className="font-display text-xl text-cream">Privacy Consent</h2>
           <p className="mt-2 text-sm text-cream-muted">
-            BeautyAI uses facial analysis to recommend skin and grooming profiles. Your image is processed securely and is not stored permanently.
+            BeautyAI uses facial analysis to recommend grooming profiles. Your image is processed securely.
           </p>
           <div className="mt-4 flex items-center justify-center gap-3">
-            <input 
-              type="checkbox" 
-              id="privacy" 
-              className="h-4 w-4 rounded border-white/20 bg-white/5 text-violet-500 focus:ring-violet-500" 
-              checked={consentChecked}
-              onChange={(e) => setConsentChecked(e.target.checked)}
-            />
-            <label htmlFor="privacy" className="text-sm text-cream cursor-pointer">
-              I agree to the processing of my facial data
-            </label>
+            <input type="checkbox" id="privacy" checked={consentChecked} onChange={(e) => setConsentChecked(e.target.checked)} className="accent-violet-500" />
+            <label htmlFor="privacy" className="text-sm text-cream">I agree to facial processing</label>
           </div>
-          <Button 
-            className="mt-6" 
-            disabled={!consentChecked}
-            onClick={() => setConsent(true)}
-          >
+          <Button className="mt-6" disabled={!consentChecked} onClick={() => setConsent(true)}>
             Enter Facial Analysis
           </Button>
         </div>
       )}
 
-      {consent && mode === "choose" && !preview && (
+      {consent && mode === "choose" && (
         <div className="grid gap-4 sm:grid-cols-2">
-          <label
-            className="flex min-h-[260px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-violet-500/40 bg-[#1A1C29]/50 p-8 backdrop-blur transition-all hover:scale-[1.01] hover:border-cyan-400/50 hover:bg-violet-500/5"
-          >
+          <label className="flex min-h-[260px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-violet-500/40 bg-[#1A1C29]/50 p-8 backdrop-blur hover:bg-violet-500/5">
             <Upload className="mb-4 h-10 w-10 text-violet-400" />
             <p className="font-display text-lg text-cream">Upload selfie</p>
-            <p className="mt-2 text-center text-sm text-cream-muted">
-              Drag & drop or click
-            </p>
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) onFile(f);
-              }}
-            />
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && startWithImage(URL.createObjectURL(e.target.files[0]))} />
           </label>
-
-          <button
-            type="button"
-            onClick={() => setMode("camera")}
-            className="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border-2 border-cyan-400/30 bg-[#1A1C29]/50 p-8 backdrop-blur transition-all hover:scale-[1.01] hover:border-cyan-400/50 hover:shadow-ai-glow-sm"
-          >
-            <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-violet-500/40 bg-gold/10">
-              <Camera className="h-8 w-8 text-gold" />
-            </span>
+          <button onClick={() => setMode("camera")} className="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border-2 border-cyan-400/30 bg-[#1A1C29]/50 p-8 backdrop-blur hover:shadow-ai-glow-sm">
+            <Camera className="mb-4 h-10 w-10 text-gold" />
             <p className="font-display text-lg text-cream">Live camera</p>
-            <p className="mt-2 text-center text-sm text-cream-muted">
-              Capture in real time — no upload needed
-            </p>
           </button>
         </div>
       )}
 
-      {consent && mode === "camera" && !preview && (
-        <BeautyAICamera
-          onCapture={startWithImage}
-          onClose={() => setMode("choose")}
-        />
+      {consent && mode === "camera" && (
+        <BeautyAICamera onCapture={startWithImage} onClose={() => setMode("choose")} />
       )}
 
       {preview && (
-        <div className="space-y-4">
-          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-            <div className="flex flex-col items-center gap-6 sm:flex-row">
-              <div className="relative h-48 w-48 shrink-0 overflow-hidden rounded-full border-4 border-violet-500/40 shadow-gold-glow">
-                <Image
-                  src={preview}
-                  alt="Captured for BeautyAI"
-                  fill
-                  className={`object-cover transition-transform duration-1000 ${analysis ? 'scale-110' : ''}`}
-                  unoptimized
-                />
-                {analyzing && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm z-30">
-                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
-                    <p className="mt-2 text-[10px] uppercase tracking-widest text-cyan-400">Processing</p>
-                  </div>
-                )}
-                {analysis && <AnalysisOverlay />}
-              </div>
-              
-              <div className="space-y-3">
-                {stepIndex >= 0 ? (
-                  <div className="space-y-2">
+        <div className="space-y-12">
+          <div className="flex flex-col items-center justify-between gap-8 lg:flex-row">
+            <div className="w-full max-w-sm shrink-0">
+               {analysis ? (
+                 <ComparisonSlider 
+                   before={preview} 
+                   after={hairstyleImageUrl(HAIRSTYLES[0].unsplashPhotoId)} 
+                 />
+               ) : (
+                 <div className="relative aspect-square w-full overflow-hidden rounded-full border-4 border-violet-500/40">
+                    <Image src={preview} alt="Preview" fill className="object-cover" unoptimized />
+                    {analyzing && <AnalysisOverlay />}
+                 </div>
+               )}
+            </div>
+            
+            <div className="flex-1 space-y-6 text-center lg:text-left">
+              {analyzing ? (
+                <div className="space-y-4">
+                  <h2 className="font-display text-3xl text-white">Generating Style Report</h2>
+                  <div className="flex flex-col gap-2">
                     {STEPS.map((s, i) => (
-                      <motion.p
-                        key={s}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: i <= stepIndex ? 1 : 0.3 }}
-                        className="text-sm text-cyan-300/90"
-                      >
-                        {s}
-                      </motion.p>
+                      <p key={i} className={cn("text-sm transition-opacity", i <= stepIndex ? "text-cyan-400" : "text-white/20")}>{s}</p>
                     ))}
                   </div>
-                ) : analysis ? (
-                  <div className="space-y-2">
-                     <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2 text-xs font-bold text-success uppercase tracking-widest">
-                       <div className="h-4 w-4 rounded-full bg-success/20 flex items-center justify-center">✓</div>
-                       Face Shape Detected
-                     </motion.div>
-                     <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="flex items-center gap-2 text-xs font-bold text-success uppercase tracking-widest">
-                       <div className="h-4 w-4 rounded-full bg-success/20 flex items-center justify-center">✓</div>
-                       Skin Tone Analyzed
-                     </motion.div>
+                </div>
+              ) : analysis ? (
+                <div className="space-y-4">
+                  <div className="flex flex-col items-center gap-4 lg:items-start">
+                    <div className="rounded-full bg-violet-600/20 border border-violet-500/30 px-4 py-1 text-xs font-bold text-violet-300 uppercase tracking-widest">
+                      Style Confidence Score: {analysis.styleCompatibilityScore || 92}%
+                    </div>
+                    <h2 className="font-display text-4xl text-white">Your Analysis is Ready</h2>
+                    <p className="text-cream-muted max-w-md">We&apos;ve analyzed your {analysis.faceShape.shape.toLowerCase()} facial structure and matched you with premium styles in Bangalore.</p>
                   </div>
-                ) : null}
-              </div>
+                  <div className="flex flex-wrap justify-center gap-3 lg:justify-start">
+                    <Button onClick={shareResult} variant="outline" className="gap-2">
+                      <Share2 size={16} /> Share Result
+                    </Button>
+                    <Button onClick={reset} variant="ghost" className="gap-2 text-cream-muted">
+                      <RotateCcw size={16} /> New Scan
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </div>
-            {!analyzing && (
-              <Button variant="outline" size="sm" onClick={reset}>
-                <RotateCcw className="mr-2 h-4 w-4" />
-                New scan
-              </Button>
-            )}
           </div>
-        </div>
-      )}
 
-      {/* Error State */}
-      {error && !analyzing && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col items-center justify-center rounded-2xl border border-rose-500/30 bg-rose-500/5 py-8 text-center"
-        >
-          <AlertCircle className="mb-3 h-10 w-10 text-rose-400" />
-          <p className="text-sm font-medium text-rose-300">{error}</p>
-          <Button variant="outline" size="sm" className="mt-4 border-rose-500/30 hover:bg-rose-500/10" onClick={reset}>
-            Try Again
-          </Button>
-        </motion.div>
-      )}
-
-      {/* Warning Banner */}
-      {warning && analysis && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-amber-300"
-        >
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          {warning}
-        </motion.div>
-      )}
-
-      {analyzing && !analysis && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-40 rounded-2xl" />
-          ))}
-        </div>
-      )}
-
-      <AnimatePresence>
-        {analysis && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-4"
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              {/* Beauty Profile Score Card */}
-              <ResultCard title="Overall Style Compatibility" className="sm:col-span-2 border-violet-500/30 bg-violet-500/5">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="font-display text-4xl text-metallic">
-                      {analysis.styleCompatibilityScore || 92}<span className="text-xl text-violet-400">/100</span>
-                    </p>
-                    <p className="text-xs font-bold text-success uppercase tracking-widest">
-                      High Confidence Analysis
-                    </p>
-                  </div>
-                  <div className="h-16 w-16 rounded-full border-4 border-violet-500/20 flex items-center justify-center relative">
-                    <div className="absolute inset-0 rounded-full border-4 border-violet-500 border-t-transparent animate-spin-slow" />
-                    <span className="text-lg font-bold text-violet-300">{analysis.styleCompatibilityScore || 92}%</span>
-                  </div>
-                </div>
-              </ResultCard>
-
-              <ResultCard title="Facial Architecture">
-                <div className="flex items-center justify-between">
-                  <p className="font-display text-2xl text-gold">
-                    {analysis.faceShape.shape}
-                  </p>
-                  <div className="bg-violet-500/20 px-2 py-1 rounded border border-violet-500/30">
-                    <p className="font-mono text-[10px] font-bold text-violet-300">
-                      {((analysis.faceShape.confidence || 0.87) * 100).toFixed(0)}% CONFIDENCE
-                    </p>
-                  </div>
-                </div>
-                <p className="mt-2 text-sm text-cream-muted">
-                  {analysis.faceShape.description}
-                </p>
-                <ul className="mt-2 list-inside list-disc text-sm text-cream">
-                  {analysis.faceShape.recommendedFacialFeatures.map((s) => (
-                    <li key={s}>{s}</li>
-                  ))}
-                </ul>
-              </ResultCard>
-              <ResultCard title="Dermis Profile">
-                <div className="flex items-center justify-between">
-                  <p className="text-cream">
-                    Undertone:{" "}
-                    <span className="text-gold">{analysis.skinTone.undertone}</span>
-                  </p>
-                  <div className="bg-cyan-500/20 px-2 py-1 rounded border border-cyan-500/30">
-                    <p className="font-mono text-[10px] font-bold text-cyan-300">
-                      {((analysis.skinTone.confidence || 0.91) * 100).toFixed(0)}% CONFIDENCE
-                    </p>
-                  </div>
-                </div>
-                <p className="text-sm text-cream-muted mt-1">
-                  {analysis.skinTone.complexion}
-                </p>
-                <ul className="mt-2 text-sm text-cream">
-                  {analysis.skinTone.treatments.map((t) => (
-                    <li key={t}>• {t}</li>
-                  ))}
-                </ul>
-              </ResultCard>
-              
-              {matched.length > 0 && (
-                <ResultCard title="Recommended Skincare Studios" className="sm:col-span-2">
-                  <div className="grid gap-4 sm:grid-cols-2 mt-1">
-                    {matched.map((s) => (
-                      <div
-                        key={s._id}
-                        className="flex items-center justify-between group p-3 rounded-xl border border-white/5 bg-white/5"
-                      >
-                        <div className="space-y-0.5">
-                          <span className="text-sm font-medium text-cream group-hover:text-gold transition-colors">{s.name}</span>
-                          <p className="text-[10px] text-cream-muted uppercase tracking-widest">{s.area}</p>
-                        </div>
-                        <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold uppercase tracking-wider" asChild>
-                          <Link href={`/book/${s._id}`}>Book</Link>
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
+          {analysis && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-12">
+              {/* Profile Grid */}
+              <div className="grid gap-4 sm:grid-cols-3">
+                <ResultCard title="Skin Type" icon={<Zap size={14} className="text-cyan-400" />}>
+                  <p className="text-lg font-display text-white">{analysis.skinTone.complexion}</p>
+                  <p className="text-xs text-cream-muted mt-1">{analysis.skinTone.undertone} undertones detected.</p>
                 </ResultCard>
+                <ResultCard title="Hair Type" icon={<Sparkles size={14} className="text-violet-400" />}>
+                  <p className="text-lg font-display text-white">{analysis.faceShape.shape}</p>
+                  <p className="text-xs text-cream-muted mt-1">Symmetrical features observed.</p>
+                </ResultCard>
+                <ResultCard title="Recommendation" icon={<Check size={14} className="text-emerald-400" />}>
+                  <p className="text-lg font-display text-white">{analysis.skinTone.treatments[0]}</p>
+                  <p className="text-xs text-cream-muted mt-1">High compatibility with current texture.</p>
+                </ResultCard>
+              </div>
+
+              {/* Hairstyle Gallery */}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-display text-2xl text-white">Signature Hairstyle Gallery</h3>
+                  <p className="text-xs text-cream-muted">Top 6 styles for {analysis.faceShape.shape} faces</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                  {HAIRSTYLES.slice(0, 6).map((style) => (
+                    <motion.div 
+                      key={style.id}
+                      whileHover={{ y: -5 }}
+                      className="group relative aspect-[3/4] overflow-hidden rounded-2xl border border-white/10 bg-[#1A1C29]"
+                    >
+                      <Image 
+                        src={hairstyleImageUrl(style.unsplashPhotoId)} 
+                        alt={style.name} 
+                        fill 
+                        className="object-cover transition-transform duration-500 group-hover:scale-110"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-100 transition-opacity" />
+                      <div className="absolute inset-x-0 bottom-0 p-4 transform translate-y-2 group-hover:translate-y-0 transition-transform">
+                        <p className="text-sm font-bold text-white">{style.name}</p>
+                        <div className="mt-2 flex gap-2">
+                          <button 
+                            onClick={() => saveStyle(style.id)}
+                            className="flex-1 rounded-lg bg-white/10 backdrop-blur-md py-1.5 text-[10px] font-bold text-white hover:bg-violet-600 transition-colors"
+                          >
+                            {savedStyles.includes(style.id) ? "SAVED" : "SAVE"}
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Treatment Cards */}
+              <div className="space-y-6">
+                 <h3 className="font-display text-2xl text-white">Recommended Dermal Rituals</h3>
+                 <div className="grid gap-4 sm:grid-cols-2">
+                   {analysis.skinTone.treatments.map((t, i) => (
+                     <div key={i} className="flex items-center gap-4 rounded-2xl border border-white/5 bg-white/5 p-4 transition-colors hover:border-violet-500/30">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-violet-600/20 text-violet-400">
+                          <Zap size={20} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-bold text-white">{t}</p>
+                          <p className="text-xs text-cream-muted">Optimized for {analysis.skinTone.complexion.toLowerCase()} skin profiles.</p>
+                        </div>
+                        <ArrowRight size={16} className="text-cream-muted" />
+                     </div>
+                   ))}
+                 </div>
+              </div>
+
+              {/* Studios */}
+              {matched.length > 0 && (
+                <div className="rounded-3xl border border-violet-500/20 bg-violet-500/5 p-8 text-center">
+                   <h3 className="font-display text-2xl text-white">Available in Bangalore Studios</h3>
+                   <p className="text-cream-muted mt-2">These enclaves are equipped for your recommended treatments.</p>
+                   <div className="mt-6 flex flex-wrap justify-center gap-3">
+                     {matched.map(s => (
+                       <Button key={s._id} variant="outline" asChild>
+                         <Link href={`/book/${s._id}`}>{s.name} · {s.area}</Link>
+                       </Button>
+                     ))}
+                   </div>
+                </div>
               )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function ResultCard({
-  title,
-  children,
-  className,
-}: {
-  title: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
+function ResultCard({ title, children, icon }: { title: string; children: React.ReactNode; icon: React.ReactNode }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`glass-card p-5 ${className || ""}`}
-    >
-      <h3 className="mb-3 text-xs uppercase tracking-wider text-violet-300">{title}</h3>
+    <div className="glass-card p-5 space-y-3">
+      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-cream-muted">
+        {icon}
+        {title}
+      </div>
       {children}
-    </motion.div>
+    </div>
   );
 }

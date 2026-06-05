@@ -25,7 +25,7 @@ export function Footer() {
               AI Agent
             </Link>
             <Link href="/dashboard" className="transition hover:text-amber-400">
-              Partner Portal
+              For Salon Owners
             </Link>
           </div>
         </div>

@@ -7,6 +7,7 @@ import { formatINR, cn } from "@/lib/utils";
 import type { SalonCardData } from "./salon-card";
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
+import { useToast } from "./ui/toast";
 
 type Service = { name: string; price: number; duration: number; category: string };
 
@@ -15,6 +16,7 @@ export function BookingFlow({
 }: {
   salon: SalonCardData & { services: Service[]; availableSlots: string[] };
 }) {
+  const { error: toastError } = useToast();
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() + i);
@@ -53,17 +55,24 @@ export function BookingFlow({
       
       const data = await res.json();
       
+      if (res.status === 401) {
+        window.location.href = `/sign-in?redirect_url=${encodeURIComponent(window.location.href)}`;
+        return;
+      }
+
       if (!res.ok) {
-        alert(data.error || "Booking failed. The slot might have been taken.");
+        toastError(data.error || "Booking failed. The slot might have been taken.");
         return;
       }
 
       setBookingId(data.bookingId || "GM-DEMO");
-      setStep(4);
-    } catch (e) {
+      window.location.href = `/bookings/confirmation/${data.bookingId || "GM-DEMO"}?salonName=${encodeURIComponent(salon.name)}&serviceName=${encodeURIComponent(service.name)}&date=${dateKey}&timeSlot=${encodeURIComponent(timeSlot)}`;
+      } catch (e) {
+
       console.error("Booking Confirm Error:", e);
-      alert("Something went wrong. Please check your connection and try again.");
-    } finally {
+      toastError("Something went wrong. Please check your connection and try again.");
+      }
+ finally {
       setLoading(false);
     }
   }

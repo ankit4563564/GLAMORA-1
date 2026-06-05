@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserButton, SignedIn, SignedOut } from "@clerk/nextjs";
+import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { isClerkConfiguredClient } from "@/lib/clerk-config";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
+import { ProfileDropdown } from "./profile-dropdown";
 
 const links = [
   { href: "/salons", label: "Marketplace" },
   { href: "/beauty-ai", label: "BeautyAI", ai: true },
   { href: "/agent", label: "AI Agent", ai: true },
-  { href: "/dashboard", label: "Partner Portal" },
+  { href: "/dashboard", label: "For Salon Owners" },
 ];
 
 export function Nav() {
@@ -60,10 +61,7 @@ export function Nav() {
                 </Button>
               </SignedOut>
               <SignedIn>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href="/profile">Profile</Link>
-                </Button>
-                <UserButton afterSignOutUrl="/" />
+                <ProfileDropdown />
               </SignedIn>
             </>
           ) : (

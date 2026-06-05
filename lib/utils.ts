@@ -6,6 +6,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function stripHtml(str: string): string {
+  if (typeof str !== "string") return str;
+  return str.replace(/<[^>]*>?/gm, "");
+}
+
 export function generateBookingId(): string {
   // Use 3 bytes of random data for 16.7 million possible combinations,
   // then convert to hex and take first 6 chars for a clean ID.

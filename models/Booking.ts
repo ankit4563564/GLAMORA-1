@@ -30,6 +30,8 @@ const BookingSchema = new Schema(
 
 // Compound index to prevent double bookings for the same slot at the same salon
 BookingSchema.index({ salonId: 1, date: 1, timeSlot: 1 }, { unique: true });
+BookingSchema.index({ salonId: 1 });
+BookingSchema.index({ status: 1 });
 BookingSchema.index({ date: 1 });
 
 export const Booking = models.Booking || model("Booking", BookingSchema);

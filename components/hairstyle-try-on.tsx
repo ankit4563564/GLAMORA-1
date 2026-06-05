@@ -6,6 +6,7 @@ import { Upload, Camera, Sparkles, RefreshCw, AlertCircle, MapPin, Star, Chevron
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "./ui/button";
+import { useToast } from "./ui/toast";
 import { HairstylePreviewResponse } from "@/lib/hairstyle-types";
 
 const LOADING_STEPS = [
@@ -47,6 +48,7 @@ async function compressImage(base64: string): Promise<string> {
 }
 
 export function HairstyleTryOn() {
+  const { info: toastInfo } = useToast();
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<HairstylePreviewResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -141,7 +143,7 @@ export function HairstyleTryOn() {
             <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
           </label>
           <button 
-             onClick={() => alert("Live camera feature coming soon!")}
+             onClick={() => toastInfo("Live camera feature coming soon!")}
              className="flex min-h-[200px] flex-col items-center justify-center rounded-2xl border-2 border-white/5 bg-[#1A1C29]/50 p-8 transition-all hover:bg-white/5"
           >
             <Camera className="mb-4 h-8 w-8 text-cream-muted" />

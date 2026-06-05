@@ -1,51 +1,44 @@
 /** 
- * Agent API Route - Reverted to MongoDB Search (Free)
+ * Agent API Route - Optimized with History & Rationale
  */
 import { NextRequest, NextResponse } from "next/server";
 import { getAgentUserId } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { unifiedAgentResponse } from "@/lib/agent-llm";
-import { parseUserQuery } from "@/lib/agent-query";
 import { getSalonsCached } from "@/lib/salon-cache";
 import type { SalonDoc } from "@/lib/salons";
 import { connectDB } from "@/lib/mongodb";
 import { Booking } from "@/models/Booking";
 import { generateBookingId } from "@/lib/utils";
-import {
-  isKnownLocationPhrase,
-  searchSalonsByLocation,
-} from "@/lib/location-search";
+import { searchSalonsByLocation } from "@/lib/location-search";
 import { resolveSalonImages } from "@/lib/salon-images";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-function toSalonCard(s: SalonDoc, query: string) {
+const agentSchema = z.object({
+  query: z.string().optional(),
+  messages: z.array(z.object({
+    role: z.string(),
+    content: z.string(),
+    salons: z.array(z.any()).optional(),
+  })).optional(),
+});
+
+function computeMatchScore(s: SalonDoc, query: string, filters: any) {
   const q = query.toLowerCase();
-  const reasons = [
-    `Experts in ${s.specialty.toLowerCase()}`,
-  ];
-  
-  if (s.rating >= 4.7) reasons.push("Top-rated for service quality");
-  if (s.priceRange.includes('₹')) {
-    const price = parseInt(s.priceRange.replace(/[^0-9]/g, '')) || 500;
-    if (price < 1500) reasons.push("Great value for luxury experience");
-  }
-  
-  // Custom reasons based on query
-  if (q.includes('hair') || q.includes('cut')) reasons.push("Precision styling specialists");
-  if (q.includes('skin') || q.includes('facial')) reasons.push("Advanced dermal therapy");
-  if (q.includes('spa') || q.includes('massage')) reasons.push("Premium relaxation lounge");
+  let score = 0;
+  score += s.rating * 10;
+  if (q.includes(s.specialty.toLowerCase())) score += 20;
+  if (q.includes(s.area.toLowerCase())) score += 15;
+  const matchingTags = s.tags?.filter(t => q.includes(t.toLowerCase())) || [];
+  score += matchingTags.length * 5;
+  if (filters.service && s.specialty.toLowerCase().includes(filters.service.toLowerCase())) score += 10;
+  return Math.min(99, Math.floor(score + 30));
+}
 
-  // Deterministic score based on rating and category match
-  let categoryBonus = 0;
-  if (q.includes(s.specialty.toLowerCase())) categoryBonus = 3;
-  
-  const scoreBase = 88 + (s.rating * 1.5) + categoryBonus;
-  // Use a small deterministic offset based on ID to avoid all 99s
-  const idOffset = (parseInt(String(s._id).slice(-2), 16) || 0) % 5;
-  const matchScore = Math.min(99, Math.floor(scoreBase + idOffset));
-
+function toSalonCard(s: SalonDoc, query: string, filters: any) {
   return {
     _id: s._id,
     name: s.name,
@@ -54,187 +47,112 @@ function toSalonCard(s: SalonDoc, query: string) {
     priceRange: s.priceRange,
     specialty: s.specialty,
     images: resolveSalonImages(s.images),
-    matchScore,
-    whyRecommended: reasons.slice(0, 3)
+    matchScore: computeMatchScore(s, query, filters),
+    whyRecommended: [
+      `Experts in ${s.specialty.toLowerCase()}`,
+      s.rating >= 4.7 ? "Top-rated for service quality" : "Highly recommended enclave",
+      "Matches your specific preferences"
+    ].slice(0, 3)
   };
 }
 
-function findSalonInQuery(query: string, salons: SalonDoc[]): SalonDoc | undefined {
+function findSalonByIndex(query: string, messageList: any[]): number | null {
   const q = query.toLowerCase();
-  const exact = salons.find((s) => q.includes(s.name.toLowerCase()));
-  if (exact) return exact;
-
-  return salons.find((s) =>
-    s.name
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((w) => w.length > 4)
-      .some((w) => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(q))
-  );
-}
-
-function generalReply(query: string): string {
-  const q = query.toLowerCase();
-  if (/^(thanks|thank you|ty|ok|okay|cool|great|nice|got it)\b/.test(q.trim())) {
-    return "You're welcome. Tell me what you want to do next, and I'll help.";
-  }
-  if (/\b(price|cost|how much|expensive|cheap)\b/.test(q)) {
-    return "Partners range from about ₹400 to ₹15,000 depending on service. Try: “hydrafacial under ₹5000 in HSR Layout”.";
-  }
-  return 'Share an area or service — e.g. "fade under ₹1200 in Koramangala" or "spas near Whitefield".';
+  const lastSalonsMsg = [...messageList].reverse().find(m => m.salons && m.salons.length > 0);
+  if (!lastSalonsMsg) return null;
+  if (/\b(first|1st|number 1)\b/.test(q)) return 0;
+  if (/\b(second|2nd|number 2)\b/.test(q)) return 1;
+  if (/\b(third|3rd|number 3)\b/.test(q)) return 2;
+  if (/\b(fourth|4th|number 4)\b/.test(q)) return 3;
+  return null;
 }
 
 export async function POST(req: NextRequest) {
   try {
     const userId = await getAgentUserId();
-    
-    // Rate limit for hackathon cost control
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-    const limit = rateLimit(ip, 10_000); // 10s window
-    if (!limit.allowed) {
-      return NextResponse.json({
-        type: "text",
-        response: "Wait a moment... I'm thinking about your previous request!",
-      }, { status: 200 });
+    
+    if (!rateLimit(ip, 5000).allowed) {
+      return NextResponse.json({ type: "text", response: "Just a second, I'm processing your request!" });
     }
 
-    let body;
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-    }
+    const body = await req.json().catch(() => ({}));
+    const validated = agentSchema.parse(body);
     
-    const query = (typeof body?.query === "string" ? body.query : "").trim();
-    const messageList = Array.isArray(body?.messages) ? body.messages : [];
+    const query = (validated.query || "").trim();
+    const messageList = validated.messages || [];
     
     if (!query && messageList.length === 0) {
       return NextResponse.json({ error: "Message required" }, { status: 400 });
     }
 
     const userQuery = query || (messageList[messageList.length - 1]?.content || "");
-
     const salons = await getSalonsCached();
-    if (salons.length === 0) {
-      console.error("[AGENT] No salons found in cache/DB");
-      return NextResponse.json({
-        type: "text",
-        response: "I'm having trouble connecting to the marketplace. Please try again in a moment.",
-      });
-    }
 
-    // --- AI FIRST FLOW (Using Groq) ---
-    const ai = await unifiedAgentResponse(userQuery, messageList, salons);
-
-    if (!ai) {
-      // Fallback if AI fails
-      return NextResponse.json({
-        type: "text",
-        response: generalReply(userQuery),
-      });
-    }
-
-    // Process AI intent
-    const intent = ai.intent;
-    const filters = ai.filters || {};
-    const aiMessage = ai.message;
-
-    const locationPhrase = filters.area || null;
-    const maxPrice = filters.maxPrice ? Number(filters.maxPrice) : undefined;
-    const service = filters.service || undefined;
-
-    const wantsBook = intent === "book" && (filters.salonName || findSalonInQuery(userQuery, salons));
-
-    if (wantsBook) {
-      const salon =
-        (filters.salonName
-          ? salons.find((s) =>
-              String(filters.salonName).toLowerCase().includes(s.name.toLowerCase()) ||
-              s.name.toLowerCase().includes(String(filters.salonName).toLowerCase())
-            )
-          : null) || findSalonInQuery(userQuery, salons);
-
-      if (salon) {
-        const servicePick =
-          salon.services.find((svc) => 
-            service ? svc.name.toLowerCase().includes(service.toLowerCase()) : false
-          ) ||
-          salon.services.find((svc) => svc.price <= (maxPrice ?? Infinity)) ||
-          salon.services[0];
-          
-        const bookingId = generateBookingId();
-        const slot = filters.time || "11:30 AM";
-        const date = filters.date || new Date().toISOString().split("T")[0];
-        
-        try {
-          await connectDB();
-          await Booking.create({
-            userId,
-            salonId: salon._id,
-            salonName: salon.name,
-            service: {
-              name: servicePick.name,
-              price: servicePick.price,
-              duration: servicePick.duration,
-            },
-            date: new Date(date),
-            timeSlot: slot,
-            status: "confirmed",
-            bookingId,
-            paymentMode: "pay_at_salon",
+    if (messageList.length === 0 && (userQuery.toLowerCase().includes("hello") || userQuery.toLowerCase().includes("hi"))) {
+      try {
+        await connectDB();
+        const lastBooking = await Booking.findOne({ userId }).sort({ createdAt: -1 });
+        if (lastBooking) {
+          const recommended = salons.find(s => s.specialty === lastBooking.service.name) || salons[0];
+          return NextResponse.json({
+            type: "text",
+            response: `Welcome back! Based on your history with ${lastBooking.salonName}, you might enjoy ${recommended.name} in ${recommended.area}. How can I help you today?`,
+            salons: [toSalonCard(recommended, "", {})]
           });
-        } catch { /* demo fallback */ }
+        }
+      } catch (e) { /* silent fallback */ }
+    }
 
-        return NextResponse.json({
-          type: "booking",
-          response: aiMessage,
-          booking: {
-            bookingId,
-            salonName: salon.name,
-            service: servicePick.name,
-            date,
-            timeSlot: slot,
-            price: servicePick.price,
-          },
+    const ai = await unifiedAgentResponse(userQuery, messageList, salons);
+    if (!ai) return NextResponse.json({ type: "text", response: "I'm here to help. Tell me what you're looking for in Bangalore!" });
+
+    const { intent, filters = {}, message: aiMessage } = ai;
+    const selectedIdx = findSalonByIndex(userQuery, messageList);
+    let targetSalon: SalonDoc | undefined;
+    
+    if (selectedIdx !== null) {
+      const lastSalonsMsg = [...messageList].reverse().find(m => m.salons && m.salons.length > 0);
+      const salonId = lastSalonsMsg.salons[selectedIdx]?._id;
+      targetSalon = salons.find(s => s._id === salonId);
+    } else if (filters.salonName) {
+      targetSalon = salons.find(s => s.name.toLowerCase().includes(filters.salonName!.toLowerCase()) || filters.salonName!.toLowerCase().includes(s.name.toLowerCase()));
+    }
+
+    if (intent === "book" && targetSalon) {
+      const servicePick = targetSalon.services.find(svc => filters.service ? svc.name.toLowerCase().includes(filters.service.toLowerCase()) : false) || targetSalon.services[0];
+      const bookingId = generateBookingId();
+      const slot = filters.time || "11:30 AM";
+      const date = filters.date || new Date().toISOString().split("T")[0];
+      try {
+        await connectDB();
+        await Booking.create({
+          userId, salonId: targetSalon._id, salonName: targetSalon.name,
+          service: { name: servicePick.name, price: servicePick.price, duration: servicePick.duration },
+          date: new Date(date), timeSlot: slot, status: "confirmed", bookingId, paymentMode: "pay_at_salon",
         });
-      }
+        return NextResponse.json({
+          type: "booking", response: aiMessage,
+          booking: { bookingId, salonName: targetSalon.name, service: servicePick.name, date, timeSlot: slot, price: servicePick.price }
+        });
+      } catch (e) { /* fallback */ }
     }
 
-    if (intent === "search" || intent === "recommend" || locationPhrase || service || maxPrice) {
-      const search = searchSalonsByLocation(salons, {
-        query: userQuery,
-        locationPhrase,
-        maxPrice,
-        service,
-        limit: 4,
-      });
-
-      let results = search.salons;
-      if (results.length === 0 && !locationPhrase) {
-        results = [...salons].sort((a, b) => b.rating - a.rating).slice(0, 4);
-      }
-
-      return NextResponse.json({
-        type: "salons",
-        response: aiMessage,
-        salons: results.map(s => toSalonCard(s, userQuery)),
-      });
-    }
-
-    // Default: Just chat
-    return NextResponse.json({
-      type: "text",
-      response: aiMessage,
+    const search = searchSalonsByLocation(salons, {
+      query: userQuery, locationPhrase: filters.area || null,
+      maxPrice: filters.maxPrice || undefined, service: filters.service || undefined, limit: 4,
     });
 
-  } catch (error) {
-    console.error("Agent route failed", error);
-    return NextResponse.json(
-      {
-        type: "text",
-        response: "I'm momentarily unavailable to chat, but you can still browse the salons below!",
-      },
-      { status: 200 }
-    );
+    let results = search.salons;
+    if (results.length === 0) results = [...salons].sort((a, b) => b.rating - a.rating).slice(0, 4);
+
+    return NextResponse.json({
+      type: "salons", response: aiMessage,
+      salons: results.map(s => toSalonCard(s, userQuery, filters))
+    });
+
+  } catch (error: any) {
+    if (error instanceof z.ZodError) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    return NextResponse.json({ type: "text", response: "I'm momentarily offline, but feel free to browse our partners below!" }, { status: 200 });
   }
 }

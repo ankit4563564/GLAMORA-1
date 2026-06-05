@@ -1,71 +1,47 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
-import { useState, useEffect } from "react";
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import { useEffect, useState } from "react";
+import { useUser, SignedIn } from "@clerk/nextjs";
 import { PageTransition } from "@/components/page-transition";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { formatINR, cn } from "@/lib/utils";
+import { 
+  TrendingUp, 
+  Users, 
+  Calendar, 
+  IndianRupee, 
+  ArrowUpRight, 
+  ArrowDownRight,
+  BrainCircuit,
+  Settings,
+  Plus
+} from "lucide-react";
 import Link from "next/link";
-
-const revenueData = Array.from({ length: 30 }, (_, i) => ({
-  day: `D${i + 1}`,
-  revenue: 12000 + Math.random() * 8000,
-  bookings: 3 + Math.floor(Math.random() * 8),
-}));
-
-const serviceSplit = [
-  { name: "Hair", value: 42 },
-  { name: "Skin", value: 28 },
-  { name: "Bridal", value: 18 },
-  { name: "Spa", value: 12 },
-];
-
-const heatmap = [
-  { hour: "10", load: 20 },
-  { hour: "12", load: 45 },
-  { hour: "14", load: 55 },
-  { hour: "16", load: 70 },
-  { hour: "18", load: 65 },
-  { hour: "20", load: 30 },
-];
-
-import { isClerkConfigured } from "@/lib/clerk-config";
 
 export default function DashboardPage() {
   const { user, isLoaded } = useUser();
-  const isDemo = !isClerkConfigured();
-  const role = (user?.publicMetadata?.role as string) || (isDemo ? "owner" : "user");
-  const [tab, setTab] = useState("overview");
-  const [prompt, setPrompt] = useState("");
-  const [channel, setChannel] = useState("Instagram Caption");
-  const [copies, setCopies] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [realBookings, setRealBookings] = useState<any[]>([]);
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (isLoaded && role === "owner") {
-      fetch("/api/bookings")
-        .then(r => r.json())
-        .then(d => setRealBookings(d.bookings || []))
-        .catch(() => {});
-    }
-  }, [isLoaded, role]);
+    if (!isLoaded) return;
+    fetch("/api/dashboard/stats")
+      .then((r) => r.json())
+      .then((d) => setData(d))
+      .finally(() => setLoading(false));
+  }, [isLoaded]);
 
-  if (isLoaded && role !== "owner" && !isDemo) {
+  const role = user?.publicMetadata?.role;
+  const isDemo = true; // For buildathon, allow demo view
+
+  if (!isLoaded) return null;
+
+  if (role !== "owner" && !isDemo) {
     return (
       <div className="mx-auto max-w-lg px-4 py-20 text-center">
         <p className="text-cream-muted">
-          Partner Portal is for salon owners. Set{" "}
+          This portal is for salon owners. Set{" "}
           <code className="text-gold">publicMetadata.role = &quot;owner&quot;</code> in
           Clerk for demo access.
         </p>
@@ -76,157 +52,165 @@ export default function DashboardPage() {
     );
   }
 
-  async function generateMarketing() {
-    setLoading(true);
-    const res = await fetch("/api/marketing", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, channel }),
-    });
-    const data = await res.json();
-    setCopies(data.copies || []);
-    setLoading(false);
-  }
-
   return (
     <PageTransition>
-      <div className="mx-auto flex max-w-7xl gap-6 px-4 py-10">
-        <aside className="hidden w-48 shrink-0 space-y-2 md:block">
-          {["overview", "marketing", "insights"].map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              className={`block w-full rounded-lg px-3 py-2 text-left text-sm capitalize ${
-                tab === t ? "bg-amber-500/20 text-amber-400" : "text-cream-muted hover:bg-white/5"
-              }`}
-            >
-              {t === "marketing" ? "AI Marketing" : t}
-            </button>
-          ))}
-        </aside>
+      <div className="mx-auto max-w-7xl px-4 py-10">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between mb-10">
+          <div>
+            <h1 className="font-display text-4xl text-white">Owner Dashboard</h1>
+            <p className="mt-2 text-cream-muted">Managing your Bangalore grooming enclave</p>
+          </div>
+          <div className="flex gap-3">
+             <Button variant="outline" className="gap-2">
+               <Settings size={16} /> Manage Salon
+             </Button>
+             <Button className="gap-2 bg-violet-600 hover:bg-violet-700">
+               <Plus size={16} /> Add Service
+             </Button>
+          </div>
+        </div>
 
-        <div className="flex-1">
-          <h1 className="font-display text-3xl text-cream">Owner Dashboard</h1>
-          <p className="text-sm text-cream-muted">
-            Welcome, {user?.firstName || "Partner"}
-          </p>
+        {loading ? (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 rounded-2xl" />)}
+          </div>
+        ) : (
+          <div className="space-y-10">
+            {/* Metric Cards */}
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard 
+                title="Total Revenue" 
+                value={formatINR(data.metrics.totalRevenue)} 
+                icon={<IndianRupee className="text-emerald-400" />} 
+                trend="+12.5%" 
+                up
+              />
+              <StatCard 
+                title="Appointments" 
+                value={data.metrics.totalBookings} 
+                icon={<Calendar className="text-violet-400" />} 
+                trend="+8.2%" 
+                up
+              />
+              <StatCard 
+                title="Retention" 
+                value={`${data.metrics.retentionRate.toFixed(1)}%`} 
+                icon={<Users className="text-cyan-400" />} 
+                trend="+4.1%" 
+                up
+              />
+              <StatCard 
+                title="Cancellation" 
+                value={`${data.metrics.cancellationRate.toFixed(1)}%`} 
+                icon={<ArrowDownRight className="text-rose-400" />} 
+                trend="-2.4%" 
+                up={false}
+              />
+            </div>
 
-          {tab === "overview" && (
-            <div className="mt-8 space-y-8">
-              <div className="h-64 rounded-2xl glass-card p-4">
-                <p className="text-sm text-gold">30-Day Revenue</p>
-                <ResponsiveContainer width="100%" height="90%">
-                  <LineChart data={revenueData}>
-                    <XAxis dataKey="day" hide />
-                    <YAxis stroke="#9B9188" fontSize={11} />
-                    <Tooltip
-                      contentStyle={{
-                        background: "#16161A",
-                        border: "1px solid #2A2826",
-                      }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="revenue"
-                      stroke="#C9A84C"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="h-56 rounded-2xl glass-card p-4">
-                  <p className="text-sm text-gold">Service Mix</p>
-                  <ResponsiveContainer width="100%" height="85%">
-                    <BarChart data={serviceSplit} layout="vertical">
-                      <XAxis type="number" hide />
-                      <YAxis dataKey="name" type="category" width={60} stroke="#9B9188" />
-                      <Bar dataKey="value" fill="#D4617A" radius={4} />
-                    </BarChart>
-                  </ResponsiveContainer>
+            <div className="grid gap-8 lg:grid-cols-3">
+              {/* Top Services Table */}
+              <div className="lg:col-span-2 glass-card p-6">
+                <h3 className="font-display text-xl text-white mb-6">Top Performing Services</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="text-[10px] uppercase tracking-widest text-cream-muted border-b border-white/5">
+                        <th className="pb-3 font-bold">Service</th>
+                        <th className="pb-3 font-bold">Bookings</th>
+                        <th className="pb-3 font-bold">Revenue</th>
+                        <th className="pb-3 font-bold">Growth</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-sm">
+                      {data.topServices.map((s: any, i: number) => (
+                        <tr key={i} className="border-b border-white/5 last:border-0">
+                          <td className="py-4 font-medium text-white">{s.name}</td>
+                          <td className="py-4 text-cream-muted">{s.count}</td>
+                          <td className="py-4 text-gold font-mono">{formatINR(s.revenue)}</td>
+                          <td className="py-4 text-emerald-400 text-xs font-bold">+{10 + i * 2}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="rounded-2xl glass-card p-4">
-                  <p className="mb-3 text-sm text-gold">Recent Bookings</p>
-                  {(realBookings.length > 0 ? realBookings.slice(0, 5) : [{ bookingId: "GM-482910" }, { bookingId: "GM-391204" }]).map((b) => (
-                    <div
-                      key={b.bookingId}
-                      className="mb-2 flex justify-between border-b border-border pb-2 text-sm"
-                    >
-                      <span className="font-mono text-cream-muted">{b.bookingId}</span>
-                      <span className="rounded-full bg-success/20 px-2 text-xs text-success">
-                        {b.status || "confirmed"}
-                      </span>
-                    </div>
-                  ))}
+              </div>
+
+              {/* AI Insights & Conversion */}
+              <div className="space-y-6">
+                <div className="glass-card p-6 border-violet-500/20 bg-violet-500/5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <BrainCircuit className="text-violet-400 h-5 w-5" />
+                    <h3 className="font-display text-xl text-white">AI Insights</h3>
+                  </div>
+                  <div className="space-y-4">
+                    {data.aiInsights.map((insight: string, i: number) => (
+                      <div key={i} className="rounded-xl bg-white/5 p-4 border border-white/5 text-sm text-cream leading-relaxed italic">
+                        &quot;{insight}&quot;
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="glass-card p-6">
+                   <p className="text-xs font-bold uppercase tracking-widest text-cream-muted mb-1">Conversion Rate</p>
+                   <div className="flex items-end gap-2">
+                     <p className="text-3xl font-display text-white">{data.metrics.conversionRate}%</p>
+                     <p className="text-xs text-emerald-400 font-bold mb-1">+1.2%</p>
+                   </div>
+                   <div className="mt-4 h-2 w-full rounded-full bg-white/5 overflow-hidden">
+                     <div className="h-full bg-gradient-to-r from-violet-600 to-cyan-500" style={{ width: `${data.metrics.conversionRate}%` }} />
+                   </div>
+                   <p className="mt-2 text-[10px] text-cream-muted uppercase tracking-tighter">Bookings vs Profile Views</p>
                 </div>
               </div>
             </div>
-          )}
 
-          {tab === "marketing" && (
-            <div className="mt-8 max-w-xl space-y-4">
-              <Input
-                placeholder="e.g. Monsoon hair fall treatment offer"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-              />
-              <select
-                className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 text-cream"
-                value={channel}
-                onChange={(e) => setChannel(e.target.value)}
-              >
-                <option>Instagram Caption</option>
-                <option>WhatsApp Blast</option>
-                <option>Push Notification</option>
-              </select>
-              <Button onClick={generateMarketing} disabled={loading || !prompt}>
-                {loading ? "Generating…" : "Generate Copy"}
-              </Button>
+            {/* Recent Bookings */}
+            <div className="glass-card p-6">
+              <h3 className="font-display text-xl text-white mb-6">Recent Activity</h3>
               <div className="space-y-3">
-                {copies.map((c, i) => (
-                  <div
-                    key={i}
-                    className="rounded-xl glass-card p-4"
-                  >
-                    <p className="text-sm text-cream">{c}</p>
-                    <button
-                      type="button"
-                      className="mt-2 text-xs text-gold hover:underline"
-                      onClick={() => navigator.clipboard.writeText(c)}
-                    >
-                      Copy
-                    </button>
+                {data.recentBookings.map((b: any) => (
+                  <div key={b._id} className="flex items-center justify-between rounded-xl bg-white/5 p-4 border border-white/5 group hover:border-violet-500/30 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-full bg-violet-600/20 flex items-center justify-center text-violet-400">
+                        {b.salonName[0]}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-white">{b.service.name}</p>
+                        <p className="text-xs text-cream-muted">{new Date(b.date).toLocaleDateString("en-IN")} · {b.timeSlot}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                       <p className="text-sm font-mono text-gold">{formatINR(b.service.price)}</p>
+                       <p className="text-[10px] uppercase font-bold text-emerald-400">{b.status}</p>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
-          )}
-
-          {tab === "insights" && (
-            <div className="mt-8 space-y-6">
-              <div className="h-56 rounded-2xl glass-card p-4">
-                <p className="text-sm text-gold">Peak Capacity Hours</p>
-                <ResponsiveContainer width="100%" height="90%">
-                  <BarChart data={heatmap}>
-                    <XAxis dataKey="hour" stroke="#9B9188" />
-                    <YAxis stroke="#9B9188" />
-                    <Bar dataKey="load" fill="#C9A84C" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="rounded-2xl border border-gold/30 bg-gold/5 p-5">
-                <p className="text-sm font-medium text-gold">AI Directive</p>
-                <p className="mt-2 text-cream-muted">
-                  Consider extending Friday hours — 35% search demand unmet in
-                  Whitefield.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </PageTransition>
+  );
+}
+
+function StatCard({ title, value, icon, trend, up }: { title: string, value: string | number, icon: React.ReactNode, trend: string, up: boolean }) {
+  return (
+    <div className="glass-card p-6 flex flex-col justify-between">
+      <div className="flex items-start justify-between">
+        <div className="p-2 rounded-xl bg-white/5 border border-white/10">
+          {icon}
+        </div>
+        <div className={cn("flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full", up ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400")}>
+          {trend}
+        </div>
+      </div>
+      <div className="mt-4">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-cream-muted mb-1">{title}</p>
+        <p className="text-3xl font-display text-white">{value}</p>
+      </div>
+    </div>
   );
 }

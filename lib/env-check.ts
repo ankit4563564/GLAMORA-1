@@ -1,26 +1,23 @@
 import { z } from "zod";
 
 const envSchema = z.object({
-  MONGODB_URI: z.string().url(),
+  MONGODB_URI: z.string().min(1, "MONGODB_URI is required"),
+  CLERK_SECRET_KEY: z.string().min(1, "CLERK_SECRET_KEY is required"),
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1, "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is required"),
   GEMINI_API_KEY: z.string().optional(),
   GROQ_API_KEY: z.string().optional(),
-  CLERK_SECRET_KEY: z.string().optional(),
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().optional(),
-  SEED_SECRET: z.string().optional(),
+  ENABLE_SEED: z.string().optional(),
+  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 
-export const env = envSchema.safeParse(process.env);
-
 export function validateEnv() {
-  const result = envSchema.safeParse(process.env);
-  if (!result.success) {
-    console.error("❌ Invalid environment variables:", result.error.format());
-    // In production, we might want to throw an error, but for hackathon demo, 
-    // we'll just log and continue to allow fallback modes.
-    if (process.env.NODE_ENV === "production") {
-       // throw new Error("Critical environment variables missing");
+  try {
+    envSchema.parse(process.env);
+  } catch (err: any) {
+    if (err instanceof z.ZodError) {
+      const missing = err.errors.map(e => e.path.join('.')).join(', ');
+      throw new Error(`❌ Invalid environment variables: ${missing}`);
     }
-  } else {
-    console.log("✅ Environment variables validated");
+    throw err;
   }
 }

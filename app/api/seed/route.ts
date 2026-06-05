@@ -13,6 +13,10 @@ export async function GET(req: Request) {
     const force = searchParams.get("force") === "1";
     const secret = searchParams.get("secret");
 
+    if (process.env.ENABLE_SEED !== "true") {
+      return NextResponse.json({ error: "Seed disabled" }, { status: 403 });
+    }
+
     // Strictly require secret for any operation that can wipe data
     if (!process.env.SEED_SECRET || secret !== process.env.SEED_SECRET) {
       console.warn("[SEED] Unauthorized attempt to access seed endpoint");
