@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useClerk, useUser, SignedIn } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -44,11 +45,13 @@ export function ProfileDropdown() {
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 p-1 pl-1 pr-3 transition-all hover:bg-white/10"
       >
-        <div className="h-8 w-8 overflow-hidden rounded-full border border-white/20">
-          <img 
+        <div className="h-8 w-8 overflow-hidden rounded-full border border-white/20 relative">
+          <Image 
             src={user.imageUrl} 
             alt={user.fullName || "Profile"} 
-            className="h-full w-full object-cover"
+            fill
+            className="object-cover"
+            unoptimized
           />
         </div>
         <span className="hidden text-xs font-medium text-cream md:block">

@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/toast";
 import { formatINR, cn } from "@/lib/utils";
 import { Calendar, Clock, MapPin, RotateCcw, XCircle, ChevronRight, Heart, Settings } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 
 type Booking = {
@@ -70,8 +71,8 @@ export default function ProfilePage() {
           {/* Sidebar */}
           <aside className="w-full shrink-0 space-y-2 lg:w-64">
             <div className="mb-6 flex items-center gap-4 px-2">
-              <div className="h-12 w-12 overflow-hidden rounded-full border-2 border-violet-500/20">
-                <img src={user?.imageUrl} alt={user?.fullName || "User"} className="h-full w-full object-cover" />
+              <div className="h-12 w-12 overflow-hidden rounded-full border-2 border-violet-500/20 relative">
+                <Image src={user?.imageUrl || "/default-avatar.png"} alt={user?.fullName || "User"} fill className="h-full w-full object-cover" unoptimized />
               </div>
               <div>
                 <p className="font-display text-lg text-white">{user?.firstName || "Guest"}</p>
