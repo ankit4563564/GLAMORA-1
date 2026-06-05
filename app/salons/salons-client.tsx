@@ -7,6 +7,7 @@ import { PageTransition } from "@/components/page-transition";
 import { SalonFilters, type FilterState } from "@/components/salon-filters";
 import { SalonCard, type SalonCardData } from "@/components/salon-card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { staggerContainer } from "@/lib/motion";
 import { LayoutGrid, Map as MapIcon } from "lucide-react";
 import type { Metadata } from "next";
