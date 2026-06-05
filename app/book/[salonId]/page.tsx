@@ -34,9 +34,11 @@ export default async function BookPage({
               name: salon.name,
               area: salon.area,
               rating: salon.rating,
+              reviewCount: salon.reviewCount,
               priceRange: salon.priceRange,
               specialty: salon.specialty,
               images: salon.images,
+              openHours: salon.openHours,
               services: salon.services,
               availableSlots: salon.availableSlots,
             }}
