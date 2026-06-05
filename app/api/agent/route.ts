@@ -113,8 +113,8 @@ export async function POST(req: NextRequest) {
     
     if (selectedIdx !== null) {
       const lastSalonsMsg = [...messageList].reverse().find(m => m.salons && m.salons.length > 0);
-      if (lastSalonsMsg) {
-        const salonId = lastSalonsMsg.salons[selectedIdx]?._id;
+      const salonId = lastSalonsMsg?.salons?.[selectedIdx]?._id;
+      if (salonId) {
         targetSalon = salons.find(s => s._id === salonId);
       }
     } else if (filters.salonName) {
