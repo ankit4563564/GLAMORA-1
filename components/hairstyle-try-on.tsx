@@ -108,11 +108,20 @@ export function HairstyleTryOn() {
       
       // Provide user-friendly error messages
       let userMessage = err.message || "Something went wrong. Please try again.";
-      if (userMessage.includes("rate")) {
+      const lowerMessage = userMessage.toLowerCase();
+      if (lowerMessage.includes("rate")) {
         userMessage = "AI is rate-limited. Free API tokens have limited requests per hour. Please wait a few minutes and try again.";
-      } else if (userMessage.includes("token") || userMessage.includes("Token")) {
-        userMessage = "AI API token issue. The Hugging Face token may be expired or invalid. Please check your .env configuration.";
-      } else if (userMessage.includes("401") || userMessage.includes("Unauthorized") || userMessage.includes("sign in")) {
+      } else if (
+        lowerMessage.includes("token") ||
+        lowerMessage.includes("username") ||
+        lowerMessage.includes("password") ||
+        lowerMessage.includes("auth") ||
+        lowerMessage.includes("credential") ||
+        lowerMessage.includes("unauthorized") ||
+        lowerMessage.includes("inference provider mapping")
+      ) {
+        userMessage = "AI API token issue. The Hugging Face token may be expired, invalid, or lacks permissions. Please check your .env configuration.";
+      } else if (lowerMessage.includes("401") || lowerMessage.includes("unauthorized") || lowerMessage.includes("sign in")) {
         userMessage = "Please sign in to use AI Hairstyle Preview.";
       }
       

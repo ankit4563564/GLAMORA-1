@@ -20,6 +20,7 @@ Focus exclusively on hairstyle recommendations and hair characteristics.`;
 // img2img models ordered by reliability — first one that works wins
 const IMG2IMG_MODELS = [
   "timbrooks/instruct-pix2pix",
+  "prompthero/openjourney",
   "runwayml/stable-diffusion-v1-5",
   "stabilityai/stable-diffusion-2-1",
 ];
@@ -108,8 +109,24 @@ async function generateHairstyleImage(
       console.log(`>>> [API] Model ${modelId} SUCCESS (${resultBuffer.length} bytes)`);
       return resultBuffer;
     } catch (err: any) {
-      console.error(`>>> [API] Model ${modelId} FAILED:`, err.message);
+      const errMsg = (typeof err === "string" ? err : err?.message || err?.toString() || "").toLowerCase();
+      console.error(`>>> [API] Model ${modelId} FAILED:`, errMsg);
       lastError = err;
+
+      // Handle token auth/credentials/provider issues immediately
+      if (
+        errMsg.includes("username") ||
+        errMsg.includes("password") ||
+        errMsg.includes("auth") ||
+        errMsg.includes("unauthorized") ||
+        errMsg.includes("401") ||
+        errMsg.includes("credential") ||
+        errMsg.includes("inference provider mapping")
+      ) {
+        throw new Error(
+          "Your HUGGINGFACE_API_TOKEN is invalid or expired. Please check your .env configuration."
+        );
+      }
 
       // If rate limited, include that in the error
       if (err.message?.includes("429") || err.message?.includes("rate")) {
