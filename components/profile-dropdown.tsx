@@ -5,17 +5,22 @@ import Link from "next/link";
 import Image from "next/image";
 import { useClerk, useUser, SignedIn } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  User, 
-  Calendar, 
-  Heart, 
-  Settings, 
-  LogOut, 
-  ChevronDown 
+import {
+  User,
+  Calendar,
+  Heart,
+  Settings,
+  LogOut,
+  ChevronDown
 } from "lucide-react";
 import { Button } from "./ui/button";
+import { isClerkConfiguredClient } from "@/lib/clerk-config";
 
 export function ProfileDropdown() {
+  if (!isClerkConfiguredClient) {
+    return null;
+  }
+
   const { user } = useUser();
   const { signOut } = useClerk();
   const [isOpen, setIsOpen] = useState(false);
