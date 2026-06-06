@@ -17,10 +17,6 @@ import { Button } from "./ui/button";
 import { isClerkConfiguredClient } from "@/lib/clerk-config";
 
 export function ProfileDropdown() {
-  if (!isClerkConfiguredClient) {
-    return null;
-  }
-
   const { user } = useUser();
   const { signOut } = useClerk();
   const [isOpen, setIsOpen] = useState(false);
@@ -36,7 +32,7 @@ export function ProfileDropdown() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  if (!user) return null;
+  if (!isClerkConfiguredClient || !user) return null;
 
   const menuItems = [
     { label: "My Bookings", href: "/profile", icon: Calendar },
