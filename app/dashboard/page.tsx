@@ -60,12 +60,21 @@ export default function DashboardPage() {
             <h1 className="font-display text-4xl text-white">Owner Dashboard</h1>
             <p className="mt-2 text-cream-muted">Managing your Bangalore grooming enclave</p>
           </div>
-          <div className="flex gap-3">
-             <Button variant="outline" className="gap-2">
-               <Settings size={16} /> Manage Salon
+          <div className="flex flex-wrap gap-3">
+             <Button variant="outline" className="gap-2" asChild>
+               <Link href="/dashboard/manage-salon">
+                 <Settings size={16} /> Manage Salon
+               </Link>
              </Button>
-             <Button className="gap-2 bg-violet-600 hover:bg-violet-700">
-               <Plus size={16} /> Add Service
+             <Button variant="outline" className="gap-2" asChild>
+               <Link href="/dashboard/manage-services">
+                 <Plus size={16} /> Manage Services
+               </Link>
+             </Button>
+             <Button variant="outline" className="gap-2" asChild>
+               <Link href="/dashboard/manage-bookings">
+                 <Calendar size={16} /> Manage Bookings
+               </Link>
              </Button>
           </div>
         </div>
