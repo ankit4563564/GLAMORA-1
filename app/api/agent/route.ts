@@ -108,6 +108,11 @@ export async function POST(req: NextRequest) {
     if (!ai) return NextResponse.json({ type: "text", response: "I'm here to help. Tell me what you're looking for in Bangalore!" });
 
     const { intent, filters = {}, message: aiMessage } = ai;
+
+    // Fallback: if LLM returns "general" but query contains salon keywords, treat as "search"
+    const salonKeywords = ["salon", "spa", "haircut", "hair", "beauty", "grooming", "massage", "facial", "makeup", "pedicure", "manicure"];
+    const hasSalonKeyword = salonKeywords.some(keyword => userQuery.toLowerCase().includes(keyword));
+    const finalIntent = (intent === "general" && hasSalonKeyword) ? "search" : intent;
     const selectedIdx = findSalonByIndex(userQuery, messageList);
     let targetSalon: SalonDoc | undefined;
     
@@ -121,7 +126,7 @@ export async function POST(req: NextRequest) {
       targetSalon = salons.find(s => s.name.toLowerCase().includes(filters.salonName!.toLowerCase()) || filters.salonName!.toLowerCase().includes(s.name.toLowerCase()));
     }
 
-    if (intent === "book" && targetSalon) {
+    if (finalIntent === "book" && targetSalon) {
       const servicePick = targetSalon.services.find(svc => filters.service ? svc.name.toLowerCase().includes(filters.service.toLowerCase()) : false) || targetSalon.services[0];
       const bookingId = generateBookingId();
       const slot = filters.time || "11:30 AM";
@@ -141,7 +146,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Only show salons for search/recommend intents, not for general queries
-    if (intent === "search" || intent === "recommend") {
+    if (finalIntent === "search" || finalIntent === "recommend") {
       const search = searchSalonsByLocation(salons, {
         query: userQuery, locationPhrase: filters.area || null,
         maxPrice: filters.maxPrice || undefined, service: filters.service || undefined, limit: 4,
