@@ -28,9 +28,17 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+    console.log("Booking request body:", body);
     const validated = bookingSchema.parse(body);
 
     await connectDB();
+
+    // Verify salon exists
+    const salon = await Salon.findById(validated.salonId);
+    if (!salon) {
+      console.error("Salon not found:", validated.salonId);
+      return NextResponse.json({ error: "Salon not found" }, { status: 404 });
+    }
 
     // 1. Conflict Check
     const existing = await Booking.findOne({
@@ -59,14 +67,16 @@ export async function POST(req: NextRequest) {
       paymentMode: "pay_at_salon",
     });
 
-    return NextResponse.json({ 
-      success: true, 
+    console.log("Booking created successfully:", bookingId);
+    return NextResponse.json({
+      success: true,
       bookingId: booking.bookingId,
-      id: booking._id 
+      id: booking._id
     });
 
   } catch (err: any) {
     if (err instanceof z.ZodError) {
+      console.error("Validation error:", err.issues);
       return NextResponse.json({ error: "Invalid request data", details: err.issues }, { status: 400 });
     }
     console.error("Booking failed:", err);
