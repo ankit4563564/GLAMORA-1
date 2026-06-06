@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
   } catch (err: any) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: "Invalid request data", details: err.errors }, { status: 400 });
+      return NextResponse.json({ error: "Invalid request data", details: err.issues }, { status: 400 });
     }
     console.error("Booking failed:", err);
     return NextResponse.json({ error: "Appointment confirmation failed." }, { status: 500 });

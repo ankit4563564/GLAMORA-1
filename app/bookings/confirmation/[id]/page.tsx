@@ -80,7 +80,7 @@ export default function ConfirmationPage({
           </div>
 
           <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-            <Button className="flex-1 gap-2 bg-violet-600 hover:bg-violet-700" onClick={() => toastSuccess?.("Calendar sync coming soon!")}>
+            <Button className="flex-1 gap-2 bg-violet-600 hover:bg-violet-700">
               <Calendar size={18} />
               Add to Calendar
             </Button>

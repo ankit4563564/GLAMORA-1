@@ -23,6 +23,7 @@ import { BeautyAICamera } from "./beauty-ai-camera";
 import { useToast } from "./ui/toast";
 import { ComparisonSlider } from "./beauty-ai-comparison";
 import { HAIRSTYLES, hairstyleImageUrl } from "@/lib/hairstyles";
+import { cn } from "@/lib/utils";
 
 const STEPS = [
   "Analyzing facial geometry…",

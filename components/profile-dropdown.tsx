@@ -89,7 +89,10 @@ export function ProfileDropdown() {
 
             <div className="mt-1 border-t border-white/5 pt-1">
               <button
-                onClick={() => signOut(() => window.location.href = "/")}
+                onClick={() => {
+                  signOut();
+                  window.location.href = "/";
+                }}
                 className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-rose-400 transition-colors hover:bg-rose-500/10"
               >
                 <LogOut size={16} />

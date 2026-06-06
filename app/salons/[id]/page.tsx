@@ -56,7 +56,7 @@ export default async function Page({ params }: { params: { id: string } }) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <SalonClient initialSalon={salon as any} />
+      <SalonClient params={params} initialSalon={salon as any} />
     </>
   );
 }

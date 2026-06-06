@@ -15,7 +15,7 @@ export function validateEnv() {
     envSchema.parse(process.env);
   } catch (err: any) {
     if (err instanceof z.ZodError) {
-      const missing = err.errors.map(e => e.path.join('.')).join(', ');
+      const missing = err.issues.map(e => e.path.join('.')).join(', ');
       throw new Error(`❌ Invalid environment variables: ${missing}`);
     }
     throw err;
