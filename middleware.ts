@@ -18,6 +18,10 @@ const isPublic = createRouteMatcher([
   "/api/agent(.*)",
   "/api/beauty-ai(.*)",
   "/api/hairstyle-preview(.*)",
+  "/api/bookings(.*)",
+  "/api/dashboard(.*)",
+  "/api/marketing(.*)",
+  "/api/seed(.*)",
 ]);
 
 const isOwnerRoute = createRouteMatcher(["/dashboard(.*)"]);

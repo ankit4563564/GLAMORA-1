@@ -80,6 +80,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid request data", details: err.issues }, { status: 400 });
     }
     console.error("Booking failed:", err);
+    // Ensure we always return JSON, never HTML
     return NextResponse.json({ error: "Appointment confirmation failed." }, { status: 500 });
   }
 }
