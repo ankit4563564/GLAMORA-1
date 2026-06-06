@@ -5,7 +5,6 @@ import { clerkPublishableKey, isClerkConfigured } from "@/lib/clerk-config";
 import { Nav } from "@/components/nav";
 import { MobileNav } from "@/components/mobile-nav";
 import { Footer } from "@/components/footer";
-import { DemoBanner } from "@/components/demo-banner";
 import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
 
@@ -68,7 +67,6 @@ export default function RootLayout({
     >
       <body className="font-sans">
         <ToastProvider>
-          {isClerkConfigured() ? <DemoBanner /> : null}
           <Nav />
           <main className="min-h-screen pb-16 md:pb-0">{children}</main>
           <MobileNav />

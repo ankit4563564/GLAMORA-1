@@ -10,8 +10,7 @@ export default function SignUpPage() {
         <div className="glass-card max-w-md p-8 shadow-gold-glow">
           <h1 className="font-display text-2xl text-cream">Demo Mode</h1>
           <p className="mt-4 text-cream-muted">
-            Clerk Authentication is not configured in this environment. 
-            Join as a VIP member to explore our premium features.
+            Clerk Authentication is not configured in this environment.
           </p>
           <div className="mt-8 flex gap-4 justify-center">
             <Button asChild>
