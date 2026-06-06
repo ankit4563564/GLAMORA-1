@@ -140,17 +140,25 @@ export async function POST(req: NextRequest) {
       } catch (e) { /* fallback */ }
     }
 
-    const search = searchSalonsByLocation(salons, {
-      query: userQuery, locationPhrase: filters.area || null,
-      maxPrice: filters.maxPrice || undefined, service: filters.service || undefined, limit: 4,
-    });
+    // Only show salons for search/recommend intents, not for general queries
+    if (intent === "search" || intent === "recommend") {
+      const search = searchSalonsByLocation(salons, {
+        query: userQuery, locationPhrase: filters.area || null,
+        maxPrice: filters.maxPrice || undefined, service: filters.service || undefined, limit: 4,
+      });
 
-    let results = search.salons;
-    if (results.length === 0) results = [...salons].sort((a, b) => b.rating - a.rating).slice(0, 4);
+      let results = search.salons;
+      if (results.length === 0) results = [...salons].sort((a, b) => b.rating - a.rating).slice(0, 4);
 
+      return NextResponse.json({
+        type: "salons", response: aiMessage,
+        salons: results.map(s => toSalonCard(s, userQuery, filters))
+      });
+    }
+
+    // For general queries, just return text without salons
     return NextResponse.json({
-      type: "salons", response: aiMessage,
-      salons: results.map(s => toSalonCard(s, userQuery, filters))
+      type: "text", response: aiMessage
     });
 
   } catch (error: any) {
