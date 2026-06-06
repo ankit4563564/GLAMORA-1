@@ -19,6 +19,7 @@ import {
   X
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function ManageSalonPage() {
   const { user } = useUser();
@@ -235,7 +236,7 @@ export default function ManageSalonPage() {
               {salon.images?.map((img: string, i: number) => (
                 <div key={i} className="relative group">
                   <div className="aspect-square rounded-xl overflow-hidden border border-white/10 bg-[#1A1C29]/50">
-                    <img src={img} alt={`Gallery ${i + 1}`} className="w-full h-full object-cover" />
+                    <Image src={img} alt={`Gallery ${i + 1}`} fill className="object-cover" unoptimized />
                   </div>
                   <button
                     onClick={() => handleImageRemove(i)}

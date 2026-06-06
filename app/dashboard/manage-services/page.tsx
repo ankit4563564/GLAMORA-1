@@ -238,7 +238,7 @@ export default function ManageServicesPage() {
 
         {salon.services?.length === 0 && (
           <div className="glass-card p-12 text-center">
-            <p className="text-cream-muted">No services added yet. Click "Add Service" to get started.</p>
+            <p className="text-cream-muted">No services added yet. Click &quot;Add Service&quot; to get started.</p>
           </div>
         )}
       </div>
