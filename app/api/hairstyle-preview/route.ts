@@ -22,13 +22,13 @@ Be precise about face shape and hair type as these will be used for database mat
 
 async function analyzeHairWithVision(image: string) {
   const { isGroqConfigured, groqVision } = await import("@/lib/groq");
-  const { getVisionModel } = await import("@/lib/gemini");
+  const { getVisionModel, isGeminiConfigured } = await import("@/lib/gemini");
   let text = "";
   
   try {
     if (isGroqConfigured()) {
       text = await groqVision({ prompt: ANALYSIS_PROMPT, image });
-    } else {
+    } else if (isGeminiConfigured()) {
       const model = getVisionModel();
       const base64 = image.replace(/^data:image\/\w+;base64,/, "");
       const result = await model.generateContent([
@@ -36,6 +36,16 @@ async function analyzeHairWithVision(image: string) {
         { inlineData: { mimeType: "image/jpeg", data: base64 } }
       ]);
       text = result.response.text();
+    } else {
+      console.warn("Hairstyle preview: No vision model configured, using default analysis");
+      return {
+        faceShape: "Oval",
+        hairType: "Wavy",
+        hairTexture: "Medium",
+        hairCondition: "Healthy",
+        recommendedHairstyle: "Textured Fringe",
+        confidence: 0.6
+      };
     }
     
     const jsonMatch = text.match(/\{[\s\S]*\}/);

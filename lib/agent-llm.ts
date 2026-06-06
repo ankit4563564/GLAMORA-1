@@ -67,9 +67,10 @@ export async function unifiedAgentResponse(
     .join("\n");
 
   const work = (async () => {
-    const text = await completeText({
-      system: SYSTEM_CONCIERGE,
-      user: `### BANGALORE PARTNERS
+    try {
+      const text = await completeText({
+        system: SYSTEM_CONCIERGE,
+        user: `### BANGALORE PARTNERS
 ${context}
 
 ### CONVERSATION HISTORY
@@ -80,22 +81,30 @@ ${chatHistory || "No prior conversation."}
 
 ### FINAL INSTRUCTION
 Provide a helpful, conversational response and the structured intent JSON.`,
-      maxTokens: 512,
-      temperature: 0.3,
-    });
-    
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    
-    try {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return {
-        intent: parsed.intent || "general",
-        filters: parsed.filters || {},
-        message: parsed.message || "How else can I help you today?"
-      };
-    } catch (e) {
-      console.error("Agent JSON parse failed:", e, text);
+        maxTokens: 512,
+        temperature: 0.3,
+      });
+      
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.warn("Agent LLM returned non-JSON response:", text);
+        return null;
+      }
+      
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          intent: parsed.intent || "general",
+          filters: parsed.filters || {},
+          message: parsed.message || "How else can I help you today?"
+        };
+      } catch (e) {
+        console.error("Agent JSON parse failed:", e, text);
+        return null;
+      }
+    } catch (error: any) {
+      console.error("Agent LLM API call failed:", error.message);
+      // Return null to trigger fallback behavior
       return null;
     }
   })();

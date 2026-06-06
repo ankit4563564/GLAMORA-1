@@ -80,7 +80,34 @@ export default function ConfirmationPage({
           </div>
 
           <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-            <Button className="flex-1 gap-2 bg-violet-600 hover:bg-violet-700">
+            <Button 
+              className="flex-1 gap-2 bg-violet-600 hover:bg-violet-700"
+              onClick={() => {
+                const event = {
+                  title: `${serviceName} at ${salonName}`,
+                  date: date,
+                  time: timeSlot,
+                  location: salonName
+                };
+                const icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART:${date.replace(/-/g, '')}T${timeSlot.replace(/:/g, '')}00
+DTEND:${date.replace(/-/g, '')}T${timeSlot.replace(/:/g, '')}00
+SUMMARY:${serviceName} at ${salonName}
+DESCRIPTION:Booking ID: ${id}
+LOCATION:${salonName}
+END:VEVENT
+END:VCALENDAR`;
+                const blob = new Blob([icsContent], { type: 'text/calendar' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `booking-${id}.ics`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
               <Calendar size={18} />
               Add to Calendar
             </Button>

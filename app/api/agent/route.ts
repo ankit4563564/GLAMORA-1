@@ -105,7 +105,31 @@ export async function POST(req: NextRequest) {
     }
 
     const ai = await unifiedAgentResponse(userQuery, messageList, salons);
-    if (!ai) return NextResponse.json({ type: "text", response: "I'm here to help. Tell me what you're looking for in Bangalore!" });
+    if (!ai) {
+      // Fallback: simple keyword-based matching when AI is not available
+      const q = userQuery.toLowerCase();
+      let matchedSalons: SalonDoc[] = [];
+      let response = "I'm here to help. Tell me what you're looking for in Bangalore!";
+      
+      // Simple keyword matching for salon search
+      if (q.includes("salon") || q.includes("spa") || q.includes("haircut") || q.includes("beauty")) {
+        const search = searchSalonsByLocation(salons, {
+          query: userQuery,
+          locationPhrase: null,
+          maxPrice: undefined,
+          service: undefined,
+          limit: 4,
+        });
+        matchedSalons = search.salons.length > 0 ? search.salons : salons.slice(0, 4);
+        response = `I found ${matchedSalons.length} great options for you in Bangalore. Here are some top-rated salons that match your interest.`;
+      }
+      
+      return NextResponse.json({
+        type: matchedSalons.length > 0 ? "salons" : "text",
+        response,
+        salons: matchedSalons.map(s => toSalonCard(s, userQuery, {}))
+      });
+    }
 
     const { intent, filters = {}, message: aiMessage } = ai;
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserId } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
-import { getVisionModel } from "@/lib/gemini";
+import { getVisionModel, isGeminiConfigured } from "@/lib/gemini";
 import { groqVision, isGroqConfigured } from "@/lib/groq";
 import { getSalons } from "@/lib/salons";
 
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     let text = "";
     if (isGroqConfigured()) {
       text = await groqVision({ prompt: PROMPT, image });
-    } else {
+    } else if (isGeminiConfigured()) {
       const model = getVisionModel();
       const base64 = image.replace(/^data:image\/\w+;base64,/, "");
 
@@ -72,14 +72,19 @@ export async function POST(req: NextRequest) {
         },
       ]);
       text = result.response.text();
+    } else {
+      console.warn("Beauty AI: No vision model configured, using default analysis");
+      analysisError = "AI vision service not configured. Showing estimated results.";
     }
 
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      analysis = JSON.parse(jsonMatch[0]);
-    } else {
-      console.warn("Beauty AI invalid JSON response:", text);
-      analysisError = "AI returned an unexpected format. Showing estimated results.";
+    if (text) {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        analysis = JSON.parse(jsonMatch[0]);
+      } else {
+        console.warn("Beauty AI invalid JSON response:", text);
+        analysisError = "AI returned an unexpected format. Showing estimated results.";
+      }
     }
   } catch (err: any) {
     console.error("Beauty AI failed:", err.message);

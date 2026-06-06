@@ -9,6 +9,12 @@ export function isGeminiConfigured(): boolean {
 export function getGeminiClient(): GoogleGenerativeAI {
   const key = process.env.GEMINI_API_KEY?.trim();
   if (!key) throw new Error("GEMINI_API_KEY is not defined");
+  
+  // Validate API key format - should start with "AIza" for Google AI Studio keys
+  if (!key.startsWith("AIza")) {
+    console.warn("GEMINI_API_KEY may be invalid - should start with 'AIza'. Current format:", key.substring(0, 10) + "...");
+  }
+  
   if (!client) client = new GoogleGenerativeAI(key);
   return client;
 }

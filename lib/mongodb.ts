@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 const MONGODB_URI = process.env.MONGODB_URI;
-const MONGODB_TIMEOUT_MS = 3_500;
+const MONGODB_TIMEOUT_MS = 10_000;
 
 interface MongooseCache {
   conn: typeof mongoose | null;

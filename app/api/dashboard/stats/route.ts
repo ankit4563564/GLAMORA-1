@@ -3,7 +3,7 @@ import { getUserId } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import { Booking } from "@/models/Booking";
 import { Salon } from "@/models/Salon";
-import { completeText } from "@/lib/llm";
+import { completeText, isTextLlmConfigured } from "@/lib/llm";
 
 export const dynamic = "force-dynamic";
 
@@ -57,10 +57,14 @@ export async function GET(req: NextRequest) {
     // AI Insights
     let aiInsights = ["Peak demand on weekends", "Hydrafacials are trending"];
     try {
-      const insightPrompt = `Analyze this salon booking summary: Total Bookings: ${totalBookings}, Revenue: ₹${totalRevenue}, Cancellation Rate: ${cancellationRate.toFixed(1)}%, Top Service: ${topServices[0]?.name}. Generate 2 brief, plain-English trend observations for the owner.`;
-      const text = await completeText({ system: "You are a business analyst.", user: insightPrompt, maxTokens: 100 });
-      aiInsights = text.split('\n').filter(l => l.trim().length > 5).slice(0, 2);
-    } catch (e) { /* fallback */ }
+      if (isTextLlmConfigured()) {
+        const insightPrompt = `Analyze this salon booking summary: Total Bookings: ${totalBookings}, Revenue: ₹${totalRevenue}, Cancellation Rate: ${cancellationRate.toFixed(1)}%, Top Service: ${topServices[0]?.name}. Generate 2 brief, plain-English trend observations for the owner.`;
+        const text = await completeText({ system: "You are a business analyst.", user: insightPrompt, maxTokens: 100 });
+        aiInsights = text.split('\n').filter(l => l.trim().length > 5).slice(0, 2);
+      }
+    } catch (e) { 
+      console.warn("Dashboard AI insights failed, using fallback:", e);
+    }
 
     return NextResponse.json({
       metrics: {
